@@ -62,3 +62,7 @@ wordler can be used in other ways. The `--help` option will display all of the c
     --solve: args are a list of answer words to solve
     --stats: arg is a filename containing output from --all (or stdin if omitted)
     --test: args depend on which test is selected.
+
+## How It Works
+
+_Info forthcoming..._
