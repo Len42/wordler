@@ -16,9 +16,10 @@
 
 #include "timer.h"
 
-// Definitions for command line options and help text
+// Definitions for command line options and help text (see cmdline.h)
 #define CMDLINE_PROG_DESCRIPTION \
-    "Wordle solver - Given a series of hints, compute which word to guess next"
+    "Wordle solver - Given a series of hints, compute which word to guess next" \
+    "\n\nExample: wordler raise y.gy. thumb yg..."
 #define CMDLINE_OPTIONS(ITEM) \
     /* ITEM(id, nameShort, nameLong, valType, defVal, help) */ \
     ITEM(Default, d, default, bool, true, "Use a default first guess") \
@@ -31,8 +32,7 @@
     "Other arguments depend on the options given.\n" \
     "With no options, args are the known hints. Each hint is a pair of args:\n" \
     "    First is the word guessed (5 letters)\n" \
-    "    Second is the 5-letter hint: 'g' for green, 'y' for yellow, '.' for grey\n" \
-    "    Example: wordler raise y.gy.\n" \
+    "    Second is the Wordle hint ('g' for green, 'y' for yellow, '.' for grey)\n" \
     "--solve: args are a list of answer words to solve\n" \
     "--stats: arg is a filename containing output from --all (or stdin if omitted)\n" \
     "--test: args depend on which test is selected."
@@ -45,7 +45,7 @@ static constexpr size_t wordLen = 5;
 // word_t is a word stored as a char array
 using word_t = char[wordLen];
 
-// wordRef_t is a reference to a word_t
+// wordRef_t is a reference to a word_t, as a std::span
 using wordRef_t = std::span<const char, wordLen>;
 
 // wordList_t is a list of words
