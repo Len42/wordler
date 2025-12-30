@@ -447,8 +447,10 @@ private:
             } else {
                 nameLong = info.nameLong;
             }
-            str << std::format("    -{}, --{:16}{} (default {})\n",
-                info.nameShort, nameLong, info.description, info.defValue);
+            //str << std::format("    -{}, --{:16}{} (default {})\n",
+            //    info.nameShort, nameLong, info.description, info.defValue);
+            str << std::format("    -{}, --{:16}{}\n",
+                info.nameShort, nameLong, info.description);
         }
         if (allowOtherArgs) {
             if (argsDescription.empty()) {

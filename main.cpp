@@ -22,7 +22,7 @@
     "\n\nExample: wordler raise y.gy. thumb yg..."
 #define CMDLINE_OPTIONS(ITEM) \
     /* ITEM(id, nameShort, nameLong, valType, defVal, help) */ \
-    ITEM(Default, d, default, bool, true, "Use a default first guess") \
+    ITEM(Default, d, default, bool, true, "Use a default first guess (default true)") \
     ITEM(Solve, s, solve, bool, false, "Solve for the given answers") \
     ITEM(SolveAll, a, all, bool, false, "Solve all possible answers - slow!") \
     ITEM(ShowStats, x, stats, bool, false, "Display stats from a results file") \
@@ -375,7 +375,7 @@ static std::string getNextGuess(const wordList_t& targets,
     // as possible.
     word_t wTemp{ '.','.', '.', '.', '.' };
     using score_t = unsigned long long;
-#if false
+#if LOOP_IMPL
     // Implementation with loops
     wordRef_t bestGuess{ wTemp };
     score_t bestScore = std::numeric_limits<score_t>::max();
