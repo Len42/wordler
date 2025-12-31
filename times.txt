@@ -1,0 +1,4 @@
+original
+$ ./wordler.exe raise y...y
+Time: 15.28 seconds
+Best guess is "topee"
