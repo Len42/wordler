@@ -56,7 +56,11 @@ using solution_t = std::pair<std::string, unsigned>;
 
 // It takes a long time to compute the first guess with no hints, and the
 // answer is always "raise". So just use that.
-static constexpr word_t firstGuess = { 'r', 'a', 'i', 's', 'e' };
+static constexpr wordRef_t firstGuess()
+{
+    static constexpr word_t firstGuess_ = { 'r', 'a', 'i', 's', 'e' };
+    return wordRef_t{ firstGuess_ };
+}
 
 // Throw an exception with a message.
 [[noreturn]] static void throwError(const char* message)
@@ -441,7 +445,7 @@ static solution_t solveWord(wordRef_t target,
             guess = targets.front();
         } else if (i == 0 && CommandLine::GetDefault()) {
             // Use the default first guess.
-            guess = firstGuess;
+            guess = std::string_view(firstGuess());
         } else {
             guess = getNextGuess(targets, guessWords);
         }
@@ -472,7 +476,7 @@ static void doNextGuess(auto args)
 {
     if (args.empty() && CommandLine::GetDefault()) {
         // Use the default first guess.
-        std::println("First guess is \"{}\"", firstGuess);
+        std::println("First guess is \"{}\"", std::string_view(firstGuess()));
     } else {
         // The command line args are the hints given so far.
         if ((args.size() % 2) != 0) {
