@@ -625,6 +625,59 @@ static void test3(auto args)
     hint.print();
 }
 
+// Test 4: Test some types
+static void test4(auto args)
+{
+    // sizeof various things
+    const char* sz = "12345";   // 8 bytes (pointer)
+    std::string st = sz;        // 32 bytes
+    std::string_view sv = st;   // 16 bytes (pointer & size)
+    std::span<const char> sp = sv;    // runtime-size span: 16 bytes (pointer & size)
+    std::span<const char, 5> sp5 { sp }; // fixed-size span: 8 bytes (only a pointer)
+    wordRef_t ref{ sv };        // wordRef_t: 8 bytes (only a pointer)
+    std::println("sz:{}, st:{}, sv:{}, sp:{}, sp5:{}, ref:{}",
+        sz, st, sv, sp, sp5, ref);
+    std::println("sz:{}, st:{}, sv:{}, sp:{}, sp5:{}, ref:{}",
+        sizeof(sz), sizeof(st), sizeof(sv), sizeof(sp), sizeof(sp5), sizeof(ref));
+
+    // struct containing word_t
+    struct WW { word_t w; };
+    std::println("sizeof(WW)={}", sizeof(WW));
+    // Make sure there's no padding in an array of structs
+    static constexpr unsigned n = 8;
+    WW aww[n];
+    static_assert(sizeof(aww) == n * sizeof(WW));
+    std::println("sizeof(WW[n])={}", sizeof(aww));
+
+    // array of word_t
+    word_t aw[n];
+    for (auto&& [i,w] : std::views::enumerate(aw)) {
+        std::copy(ref.begin(), ref.end(), w);// or std::begin(w));
+        w[0] = char(i) + 'A';
+    }
+    for (auto&& w : aw) {
+        std::println("{}", std::string_view(w, wordLen));
+    }
+    const char* pch = (const char*)aw;
+    std::string_view s(pch, n * wordLen);
+    std::println("{}", s);
+
+    // word_t and wordRef_t
+    std::println("word_t:{}", std::string_view(aw[0], wordLen));
+    wordRef_t wr = aw[0];
+    std::println("wordRef_t:{}", wr);
+
+    //std::vector<word_t> v;
+    //v.push_back(aw[0]); // oops, can't add to this vector :-(
+    using wa_t = std::array<char, wordLen>;
+    wa_t w = { 'a','b','c','d','e' };
+    std::vector<wa_t> v;
+    v.push_back(w);
+    std::println("v[0]:{}", v[0]);
+    wr = v[0];
+    std::println("wr:{}", wr);
+}
+
 // Run the test specified by the --test option.
 static void doTest(auto args)
 {
@@ -632,6 +685,7 @@ static void doTest(auto args)
     case 1: test1(args); break;
     case 2: test2(args); break;
     case 3: test3(args); break;
+    case 4: test4(args); break;
     default: throwError("Invalid test number");
     }
 }
