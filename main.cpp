@@ -46,10 +46,8 @@ static constexpr size_t wordLen = 5;
 // word_t is a word stored as a char array
 using word_t = std::array<char, wordLen>;
 
-using wordRef_t = const word_t&;
-
 // Default value for word_t that is initialized to a non-word.
-static constexpr wordRef_t nonWord()
+static constexpr const word_t& nonWord()
 {
     static constexpr word_t nonWord_ = { '.', '.', '.', '.', '.' };
     return nonWord_;
@@ -63,7 +61,7 @@ using solution_t = std::pair<word_t, unsigned>;
 
 // It takes a long time to compute the first guess with no hints, and the
 // answer is always "raise". So just use that.
-static constexpr wordRef_t firstGuess()
+static constexpr const word_t& firstGuess()
 {
     static constexpr word_t firstGuess_ = { 'r', 'a', 'i', 's', 'e' };
     return  firstGuess_;
@@ -138,7 +136,7 @@ private:
 
 public:
     // Construct a Hint from a guess word and a hint pattern.
-    explicit Hint(wordRef_t guessIn, wordRef_t hintIn)
+    explicit Hint(const word_t& guessIn, const word_t& hintIn)
     {
         guess = guessIn;
         hint = hintIn;
@@ -154,7 +152,7 @@ public:
 
     // Match a word against this hint.
     // Returns true if word matches this, false if not.
-    bool match(wordRef_t word) const
+    bool match(const word_t& word) const
     {
         // Keep track of letters that have been matched and ignore them later.
         bool matched[wordLen] = { false,false,false,false,false };
@@ -221,7 +219,7 @@ public:
     }
 
     // Return a Hint made by comparing a guess word to a target word.
-    static Hint fromGuess(wordRef_t wTargetIn, wordRef_t wGuessIn)
+    static Hint fromGuess(const word_t& wTargetIn, const word_t& wGuessIn)
     {
         // Make copies of the words so that letters can be marked off as they
         // are matched.
@@ -368,7 +366,7 @@ static wordList_t filterTargets(const Hint& hint, const wordList_t& targetsIn)
 }
 
 // If the given word is in the given wordList_t, remove it.
-static void removeWord(wordRef_t word, wordList_t& list)
+static void removeWord(const word_t& word, wordList_t& list)
 {
     auto pos = std::ranges::find(list, word);
     if (pos != list.end()) {
@@ -378,7 +376,7 @@ static void removeWord(wordRef_t word, wordList_t& list)
 
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
-static wordRef_t getNextGuess(const wordList_t& targets,
+static const word_t& getNextGuess(const wordList_t& targets,
     const wordList_t& guessWords)
 {
     // Check a couple of special cases.
@@ -388,7 +386,7 @@ static wordRef_t getNextGuess(const wordList_t& targets,
     } else if (targets.size() <= 2) {
         // Only two possibilities remain - pick one.
         // This prevents an extra roundabout guess when there are only 2 alternatives.
-        wordRef_t guess = targets.front();
+        const word_t& guess = targets.front();
         return guess;
     }
 
@@ -398,7 +396,8 @@ static wordRef_t getNextGuess(const wordList_t& targets,
     using score_t = unsigned long long;
 #if LOOP_IMPL
     // Implementation with loops
-    //wordRef_t bestGuess = nonWord();
+    // // TODO: CHECK
+    //const word_t& bestGuess = nonWord();
     const word_t* bestGuess = &nonWord();
     score_t bestScore = std::numeric_limits<score_t>::max();
     for (auto&& guess : guessWords) {
@@ -420,8 +419,6 @@ static wordRef_t getNextGuess(const wordList_t& targets,
 #else
     // Implementation with ranges and algorithms
     // (no faster but certainly uglier)
-    // TEST
-    //using guessScore_t = std::pair<wordRef_t, score_t>;
     using guessScore_t = std::pair<const word_t*, score_t>;
     // Compute numeric scores for all possible guesses.
     auto guessScores = guessWords
@@ -448,7 +445,7 @@ static wordRef_t getNextGuess(const wordList_t& targets,
 }
 
 // Solve for a given target word by calling getNextGuess() repeatedly.
-static solution_t solveWord(wordRef_t target,
+static solution_t solveWord(const word_t& target,
     const wordList_t& targetWords,
     const wordList_t& guessWords,
     bool fPrintGuesses)
@@ -536,7 +533,7 @@ static void doSolve(auto args)
 static void doSolveAll(auto args)
 {
     for (auto&& target : allTargets) {
-        solution_t s = solveWord(wordRef_t{ target }, allTargets, allGuesses, false);
+        solution_t s = solveWord(target, allTargets, allGuesses, false);
         std::println("{}, {}", s.first, s.second);
         std::cout.flush();
     }
@@ -603,7 +600,6 @@ static void test1(auto args)
     Hint hint(args[0], args[1]);
     hint.print();
     for (auto&& arg : args | std::views::drop(2)) {
-        // TEST
         word_t word;
         checkWord(arg);
         copyWordFrom(word, arg);
