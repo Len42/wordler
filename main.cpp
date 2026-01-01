@@ -59,13 +59,9 @@ static void copyWordFrom(word_t& word, wordRef_t wordIn)
 }
 
 // wordList_t is a list of words
-// TODO
-//using wordList_t = std::vector<std::string>;
 using wordList_t = std::vector<word_t>;
 
 // solution_t is an answer word and the number of guesses that it took to solve
-// TODO
-//using solution_t = std::pair<std::string, unsigned>;
 using solution_t = std::pair<word_t, unsigned>;
 
 // It takes a long time to compute the first guess with no hints, and the
@@ -263,7 +259,7 @@ static wordList_t loadWordFile(std::string_view filename)
     word_t wtemp;
     while (std::getline(file, word)) {
         checkWord(word);
-        // TODO
+        // TODO: is there a better way?
         wordRef_t wr{ word.c_str(),wordLen };
         copyWordFrom(wtemp, wr);
         words.push_back(wtemp);
@@ -365,7 +361,6 @@ static wordList_t filterTargets(const Hint& hint, const wordList_t& targetsIn)
 }
 
 // If the given word is in the given wordList_t, remove it.
-// TODO
 static void removeWord(wordRef_t word, wordList_t& list)
 {
     // TODO: is there a better way?
@@ -473,8 +468,6 @@ static solution_t solveWord(wordRef_t target,
         // Is this the correct answer?
         if (std::string_view(guess) == std::string_view(target)) {
             // Return the answer and the number of guesses.
-            // TODO: better way?
-            //return { std::string(std::from_range, guess), i + 1 };
             word_t wtemp;
             copyWordFrom(wtemp, guess);
             return { wtemp, i + 1 };
@@ -484,8 +477,6 @@ static solution_t solveWord(wordRef_t target,
         targets = filterTargets(hint, targets);
         // Also remove guess from targets, if it's there, to avoid getting stuck
         // in a loop.
-        // TODO
-        //removeWord(std::string(std::from_range, guess), targets);
         removeWord(guess, targets);
         if (targets.empty()) {
             // Oops, no matching words at all!
