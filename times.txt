@@ -2,3 +2,8 @@ original
 $ ./wordler.exe raise y...y
 Time: 15.28 seconds
 Best guess is "topee"
+
+most std::string temps removed
+$ ./wordler.exe raise y...y
+Time: 15.12 seconds
+Best guess is "topee"

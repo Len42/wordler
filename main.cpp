@@ -48,7 +48,15 @@ using word_t = char[wordLen];
 // wordRef_t is a reference to a word_t, as a std::span
 using wordRef_t = std::span<const char, wordLen>;
 
+// This is a default value for a wordRef_t that doesn't refer to a particular word yet.
+static constexpr wordRef_t nonWord()
+{
+    static constexpr word_t default_ = { '.', '.', '.', '.', '.' };
+    return wordRef_t{ default_ };
+}
+
 // wordList_t is a list of words
+// TODO: Can this be wordRef_t instead?
 using wordList_t = std::vector<std::string>;
 
 // solution_t is an answer word and the number of guesses that it took to solve
@@ -360,7 +368,7 @@ static void removeWord(std::string_view word, wordList_t& list)
 
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
-static std::string getNextGuess(const wordList_t& targets,
+static wordRef_t getNextGuess(const wordList_t& targets,
     const wordList_t& guessWords)
 {
     // Check a couple of special cases.
@@ -370,18 +378,17 @@ static std::string getNextGuess(const wordList_t& targets,
     } else if (targets.size() <= 2) {
         // Only two possibilities remain - pick one.
         // This prevents an extra roundabout guess when there are only 2 alternatives.
-        std::string guess = targets.front();
+        wordRef_t guess = wordRef_t(targets.front());
         return guess;
     }
 
     // Test all guess words, looking for the best one.
     // A good guess is one that is expected to cut down the target list as much
     // as possible.
-    word_t wTemp{ '.','.', '.', '.', '.' };
     using score_t = unsigned long long;
 #if LOOP_IMPL
     // Implementation with loops
-    wordRef_t bestGuess{ wTemp };
+    wordRef_t bestGuess = nonWord();
     score_t bestScore = std::numeric_limits<score_t>::max();
     for (auto&& guess : guessWords) {
         // Score this guess based on how few matches it allows, over all possible
@@ -398,7 +405,7 @@ static std::string getNextGuess(const wordList_t& targets,
             bestGuess = wordRef_t{ guess };
         }
     }
-    return std::string(std::from_range, bestGuess);
+    return bestGuess;
 #else
     // Implementation with ranges and algorithms
     // (no faster but certainly uglier)
@@ -418,19 +425,19 @@ static std::string getNextGuess(const wordList_t& targets,
             });
     // Choose the guess with the best (lowest) score.
     guessScore_t best = std::accumulate(guessScores.begin(), guessScores.end(),
-        guessScore_t(wTemp, std::numeric_limits<score_t>::max()),
+        guessScore_t(nonWord(), std::numeric_limits<score_t>::max()),
         [](const guessScore_t& min, const guessScore_t& next) {
             return (next.second < min.second) ? next : min;
         });
     // Return the best guess word.
-    return std::string(std::from_range, best.first);
+    return best.first;
 #endif
 }
 
 // Solve for a given target word by calling getNextGuess() repeatedly.
 static solution_t solveWord(wordRef_t target,
-    const wordList_t& guessWords,
     const wordList_t& targetWords,
+    const wordList_t& guessWords,
     bool fPrintGuesses)
 {
     // Keep the list of currently plausible target words in a std::vector.
@@ -439,29 +446,29 @@ static solution_t solveWord(wordRef_t target,
     // or all guesses are used up.
     static constexpr unsigned maxGuesses = 6;
     for (unsigned i = 0; i < maxGuesses; ++i) {
-        std::string guess;
+        wordRef_t guess = nonWord();
         if (targets.size() == 1) {
             // Only one possibility left, this should be the answer.
-            guess = targets.front();
+            guess = wordRef_t(targets.front());
         } else if (i == 0 && CommandLine::GetDefault()) {
             // Use the default first guess.
-            guess = std::string_view(firstGuess());
+            guess = firstGuess();
         } else {
             guess = getNextGuess(targets, guessWords);
         }
         if (fPrintGuesses)
-            std::println("Guess #{} is \"{}\"", i + 1, guess);
+            std::println("Guess #{} is \"{}\"", i + 1, std::string_view(guess));
         // Is this the correct answer?
-        if (guess == std::string_view(target)) {
+        if (std::string_view(guess) == std::string_view(target)) {
             // Return the answer and the number of guesses.
-            return { guess, i + 1 };
+            return { std::string(std::from_range, guess), i + 1 };
         }
         // Filter the targets list according to the latest guess.
         Hint hint = Hint::fromGuess(target, wordRef_t{ guess });
         targets = filterTargets(hint, targets);
         // Also remove guess from targets, if it's there, to avoid getting stuck
         // in a loop.
-        removeWord(guess, targets);
+        removeWord(std::string(std::from_range, guess), targets);
         if (targets.empty()) {
             // Oops, no matching words at all!
             throwError("No matching words found.");
@@ -482,14 +489,14 @@ static void doNextGuess(auto args)
         if ((args.size() % 2) != 0) {
             throwError("An even number of arguments is required.");
         }
-        std::string guess;
+        wordRef_t guess = nonWord();
         // Find a good next guess. Show how long it takes.
         showTime([&]() {
             auto hints = makeHints(args);
             wordList_t targets = filterTargets(hints, allTargets);
             guess = getNextGuess(targets, allGuesses);
             });
-        std::println("Best guess is \"{}\"", guess);
+        std::println("Best guess is \"{}\"", std::string_view(guess));
     }
 }
 
@@ -503,7 +510,7 @@ static void doSolve(auto args)
         std::println("Target: \"{}\"", std::string_view(target));
         solution_t s;
         showTime([&]() {
-            s = solveWord(target, allGuesses, allTargets, true);
+            s = solveWord(target, allTargets, allGuesses, true);
             });
         std::println("Answer: \"{}\" in {} tries", s.first, s.second);
     }
@@ -514,7 +521,7 @@ static void doSolve(auto args)
 static void doSolveAll(auto args)
 {
     for (auto&& target : allTargets) {
-        solution_t s = solveWord(wordRef_t{ target }, allGuesses, allTargets, false);
+        solution_t s = solveWord(wordRef_t{ target }, allTargets, allGuesses, false);
         std::println("{}, {}", s.first, s.second);
         std::cout.flush();
     }
