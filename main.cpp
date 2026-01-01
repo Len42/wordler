@@ -2,6 +2,7 @@
 // This source code is licensed under the MIT license - see LICENSE file.
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <fstream>
 #include <iostream>
@@ -43,7 +44,7 @@
 static constexpr size_t wordLen = 5;
 
 // word_t is a word stored as a char array
-using word_t = char[wordLen];
+using word_t = std::array<char, wordLen>;
 
 // wordRef_t is a reference to a word_t, as a std::span
 using wordRef_t = std::span<const char, wordLen>;
@@ -201,8 +202,8 @@ public:
 
     void print() const
     {
-        std::print("guess:{}", std::string_view(guess, wordLen));
-        std::println(" hint:{}", std::string_view(hint, wordLen));
+        std::print("guess:{}", std::string_view(guess));
+        std::println(" hint:{}", std::string_view(hint));
     }
 
     // Return a Hint made by comparing a guess word to a target word.
@@ -652,27 +653,23 @@ static void test4(auto args)
     // array of word_t
     word_t aw[n];
     for (auto&& [i,w] : std::views::enumerate(aw)) {
-        std::copy(ref.begin(), ref.end(), w);// or std::begin(w));
+        std::copy(ref.begin(), ref.end(), w.begin());
         w[0] = char(i) + 'A';
     }
     for (auto&& w : aw) {
-        std::println("{}", std::string_view(w, wordLen));
+        std::println("{}", std::string_view(w));
     }
     const char* pch = (const char*)aw;
     std::string_view s(pch, n * wordLen);
     std::println("{}", s);
 
     // word_t and wordRef_t
-    std::println("word_t:{}", std::string_view(aw[0], wordLen));
+    std::println("word_t:{}", std::string_view(aw[0]));
     wordRef_t wr = aw[0];
     std::println("wordRef_t:{}", wr);
 
-    //std::vector<word_t> v;
-    //v.push_back(aw[0]); // oops, can't add to this vector :-(
-    using wa_t = std::array<char, wordLen>;
-    wa_t w = { 'a','b','c','d','e' };
-    std::vector<wa_t> v;
-    v.push_back(w);
+    std::vector<word_t> v;
+    v.push_back(aw[0]); // oops, can't add to this vector :-(
     std::println("v[0]:{}", v[0]);
     wr = v[0];
     std::println("wr:{}", wr);
