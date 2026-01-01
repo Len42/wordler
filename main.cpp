@@ -49,19 +49,24 @@ using word_t = std::array<char, wordLen>;
 // wordRef_t is a reference to a word_t, as a std::span
 using wordRef_t = std::span<const char, wordLen>;
 
-// This is a default value for a wordRef_t that doesn't refer to a particular word yet.
-static constexpr wordRef_t nonWord()
+// Default values for word_t and wordRef_t that are initialized to a non-word.
+static constexpr word_t nonWord = { '.', '.', '.', '.', '.' };
+static constexpr wordRef_t nonWordRef() { return wordRef_t{ nonWord }; }
+
+static void copyWordFrom(word_t& word, wordRef_t wordIn)
 {
-    static constexpr word_t default_ = { '.', '.', '.', '.', '.' };
-    return wordRef_t{ default_ };
+    std::ranges::copy(wordIn, std::begin(word));
 }
 
 // wordList_t is a list of words
-// TODO: Can this be wordRef_t instead?
-using wordList_t = std::vector<std::string>;
+// TODO
+//using wordList_t = std::vector<std::string>;
+using wordList_t = std::vector<word_t>;
 
 // solution_t is an answer word and the number of guesses that it took to solve
-using solution_t = std::pair<std::string, unsigned>;
+// TODO
+//using solution_t = std::pair<std::string, unsigned>;
+using solution_t = std::pair<word_t, unsigned>;
 
 // It takes a long time to compute the first guess with no hints, and the
 // answer is always "raise". So just use that.
@@ -240,12 +245,6 @@ public:
         }
         return Hint{ wGuessIn, hintWord };
     }
-
-private:
-    static void copyWordFrom(word_t& word, wordRef_t wordIn)
-    {
-        std::ranges::copy(wordIn, std::begin(word));
-    }
 };
 
 static wordList_t allTargets;   // List of all possible answer words
@@ -261,9 +260,13 @@ static wordList_t loadWordFile(std::string_view filename)
         throwError(std::format("Failed to open file {}"sv, filename).c_str());
     }
     std::string word;
+    word_t wtemp;
     while (std::getline(file, word)) {
         checkWord(word);
-        words.push_back(word);
+        // TODO
+        wordRef_t wr{ word.c_str(),wordLen };
+        copyWordFrom(wtemp, wr);
+        words.push_back(wtemp);
     }
     file.close();
     return words;
@@ -320,7 +323,10 @@ static std::vector<solution_t> loadResultsFile(std::string_view filename)
         while (line.starts_with(' '))
             line.remove_prefix(1);
         unsigned num = numFromStr(line);
-        results.push_back(solution_t{ word, num });
+        // TODO: better way?
+        word_t wtemp;
+        copyWordFrom(wtemp, wordRef_t{ word });
+        results.push_back(solution_t{ wtemp, num });
     }
     return results;
 }
@@ -359,9 +365,14 @@ static wordList_t filterTargets(const Hint& hint, const wordList_t& targetsIn)
 }
 
 // If the given word is in the given wordList_t, remove it.
-static void removeWord(std::string_view word, wordList_t& list)
+// TODO
+static void removeWord(wordRef_t word, wordList_t& list)
 {
-    auto pos = std::ranges::find(list, word);
+    // TODO: is there a better way?
+    //auto pos = std::ranges::find(list, word);
+    word_t temp;
+    copyWordFrom(temp, word);
+    auto pos = std::ranges::find(list, temp);
     if (pos != list.end()) {
         list.erase(pos);
     }
@@ -389,7 +400,7 @@ static wordRef_t getNextGuess(const wordList_t& targets,
     using score_t = unsigned long long;
 #if LOOP_IMPL
     // Implementation with loops
-    wordRef_t bestGuess = nonWord();
+    wordRef_t bestGuess = nonWordRef();
     score_t bestScore = std::numeric_limits<score_t>::max();
     for (auto&& guess : guessWords) {
         // Score this guess based on how few matches it allows, over all possible
@@ -426,7 +437,7 @@ static wordRef_t getNextGuess(const wordList_t& targets,
             });
     // Choose the guess with the best (lowest) score.
     guessScore_t best = std::accumulate(guessScores.begin(), guessScores.end(),
-        guessScore_t(nonWord(), std::numeric_limits<score_t>::max()),
+        guessScore_t(nonWordRef(), std::numeric_limits<score_t>::max()),
         [](const guessScore_t& min, const guessScore_t& next) {
             return (next.second < min.second) ? next : min;
         });
@@ -447,7 +458,7 @@ static solution_t solveWord(wordRef_t target,
     // or all guesses are used up.
     static constexpr unsigned maxGuesses = 6;
     for (unsigned i = 0; i < maxGuesses; ++i) {
-        wordRef_t guess = nonWord();
+        wordRef_t guess = nonWordRef();
         if (targets.size() == 1) {
             // Only one possibility left, this should be the answer.
             guess = wordRef_t(targets.front());
@@ -462,14 +473,20 @@ static solution_t solveWord(wordRef_t target,
         // Is this the correct answer?
         if (std::string_view(guess) == std::string_view(target)) {
             // Return the answer and the number of guesses.
-            return { std::string(std::from_range, guess), i + 1 };
+            // TODO: better way?
+            //return { std::string(std::from_range, guess), i + 1 };
+            word_t wtemp;
+            copyWordFrom(wtemp, guess);
+            return { wtemp, i + 1 };
         }
         // Filter the targets list according to the latest guess.
         Hint hint = Hint::fromGuess(target, wordRef_t{ guess });
         targets = filterTargets(hint, targets);
         // Also remove guess from targets, if it's there, to avoid getting stuck
         // in a loop.
-        removeWord(std::string(std::from_range, guess), targets);
+        // TODO
+        //removeWord(std::string(std::from_range, guess), targets);
+        removeWord(guess, targets);
         if (targets.empty()) {
             // Oops, no matching words at all!
             throwError("No matching words found.");
@@ -490,11 +507,12 @@ static void doNextGuess(auto args)
         if ((args.size() % 2) != 0) {
             throwError("An even number of arguments is required.");
         }
-        wordRef_t guess = nonWord();
+        wordRef_t guess = nonWordRef();
+        wordList_t targets;
         // Find a good next guess. Show how long it takes.
         showTime([&]() {
             auto hints = makeHints(args);
-            wordList_t targets = filterTargets(hints, allTargets);
+            targets = filterTargets(hints, allTargets);
             guess = getNextGuess(targets, allGuesses);
             });
         std::println("Best guess is \"{}\"", std::string_view(guess));
@@ -513,7 +531,7 @@ static void doSolve(auto args)
         showTime([&]() {
             s = solveWord(target, allTargets, allGuesses, true);
             });
-        std::println("Answer: \"{}\" in {} tries", s.first, s.second);
+        std::println("Answer: \"{}\" in {} tries", std::string_view(s.first), s.second);
     }
 }
 
@@ -533,8 +551,8 @@ struct Stats
 {
     unsigned long count = 0;
     unsigned long totalGuesses = 0;
-    solution_t min = { ".....",99 };
-    solution_t max = { ".....",0 };
+    solution_t min = { nonWord, 99 };
+    solution_t max = { nonWord, 0 };
 };
 
 // Display statistics for the results produced by --all.
@@ -673,6 +691,14 @@ static void test4(auto args)
     std::println("v[0]:{}", v[0]);
     wr = v[0];
     std::println("wr:{}", wr);
+
+    word_t w = aw[3];
+    std::println("after assignment:{}", w);
+
+    // copy from std::string
+    word_t w2;
+    copyWordFrom(w2, w);
+    v.push_back(w2);
 }
 
 // Run the test specified by the --test option.
