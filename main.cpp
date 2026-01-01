@@ -46,10 +46,6 @@ static constexpr size_t wordLen = 5;
 // word_t is a word stored as a char array
 using word_t = std::array<char, wordLen>;
 
-// TEST
-//////// wordRef_t is a reference to a word_t, as a std::span
-//////using wordRef_t = std::span<const char, wordLen>;
-// wordRef_t is a reference to a word_t
 using wordRef_t = const word_t&;
 
 // Default value for word_t that is initialized to a non-word.
@@ -115,14 +111,11 @@ static void checkHint(std::span<const char> hint)
     }
 }
 
-// TEST
-//static void copyWordFrom(word_t& word, wordRef_t wordIn)
-//{
-//    std::ranges::copy(wordIn, std::begin(word));
-//}
-
+// Copy a word from a string into a fixed-size array.
 static void copyWordFrom(word_t& word, std::string_view wordIn)
 {
+    if (wordIn.size() != wordLen)
+        throwWordError(wordIn);
     std::ranges::copy(wordIn, std::begin(word));
 }
 
@@ -147,9 +140,6 @@ public:
     // Construct a Hint from a guess word and a hint pattern.
     explicit Hint(wordRef_t guessIn, wordRef_t hintIn)
     {
-        // TEST
-        //copyWordFrom(guess, guessIn);
-        //copyWordFrom(hint, hintIn);
         guess = guessIn;
         hint = hintIn;
     }
@@ -235,11 +225,8 @@ public:
     {
         // Make copies of the words so that letters can be marked off as they
         // are matched.
-    // TEST
         word_t target = wTargetIn;
-        //copyWordFrom(target, wTargetIn);
         word_t guess = wGuessIn;
-        //copyWordFrom(guess, wGuessIn);
         // Default to '.' which means an unmatched (grey) letter
         word_t hintWord{ '.', '.', '.', '.', '.' };
         // Find exact matches (green)
@@ -283,10 +270,8 @@ static wordList_t loadWordFile(std::string_view filename)
     }
     std::string word;
     while (std::getline(file, word)) {
-        // TEST
         checkWord(word);
         word_t wtemp;
-        //wordRef_t wr{ word.c_str(),wordLen };
         copyWordFrom(wtemp, word);
         words.push_back(wtemp);
     }
@@ -344,7 +329,6 @@ static std::vector<solution_t> loadResultsFile(std::string_view filename)
         while (line.starts_with(' '))
             line.remove_prefix(1);
         unsigned num = numFromStr(line);
-        // TEST
         word_t wtemp;
         copyWordFrom(wtemp, word);
         results.push_back(solution_t{ wtemp, num });
@@ -359,10 +343,6 @@ static std::ranges::view auto makeHints(const std::ranges::range auto& args)
 {
     return args | std::views::chunk(2)
         | std::views::transform([](auto&& pattern) {
-            checkWord(pattern[0]);
-            checkHint(pattern[1]);
-            // TEST
-            //return Hint(wordRef_t{ pattern[0] }, wordRef_t{ pattern[1] });
             return Hint(pattern[0], pattern[1]);
             });
 }
@@ -374,8 +354,6 @@ static wordList_t filterTargets(const std::ranges::range auto& hints,
     wordList_t targets = targetsIn
         | std::views::filter([&hints](auto&& word) {
             return std::ranges::all_of(hints, [&word](auto&& hint) {
-                // TEST
-                //return hint.match(wordRef_t{ word });
                 return hint.match(word);
                 });
             })
@@ -392,11 +370,7 @@ static wordList_t filterTargets(const Hint& hint, const wordList_t& targetsIn)
 // If the given word is in the given wordList_t, remove it.
 static void removeWord(wordRef_t word, wordList_t& list)
 {
-    // TEST
     auto pos = std::ranges::find(list, word);
-    //word_t temp;
-    //copyWordFrom(temp, word);
-    //auto pos = std::ranges::find(list, temp);
     if (pos != list.end()) {
         list.erase(pos);
     }
@@ -485,8 +459,6 @@ static solution_t solveWord(wordRef_t target,
     // or all guesses are used up.
     static constexpr unsigned maxGuesses = 6;
     for (unsigned i = 0; i < maxGuesses; ++i) {
-        // TEST
-#if 1
         word_t guess = nonWord();
         if (targets.size() == 1) {
             // Only one possibility left, this should be the answer.
@@ -497,40 +469,11 @@ static solution_t solveWord(wordRef_t target,
         } else {
             guess = getNextGuess(targets, guessWords);
         }
-#elif 1
-        const word_t* pguess = &nonWord();
-        if (targets.size() == 1) {
-            // Only one possibility left, this should be the answer.
-            pguess = &targets.front();
-        } else if (i == 0 && CommandLine::GetDefault()) {
-            // Use the default first guess.
-            pguess = &firstGuess();
-        } else {
-            pguess = &getNextGuess(targets, guessWords);
-        }
-#else
-        wordRef_t guess = nonWord();
-        if (targets.size() == 1) {
-            // Only one possibility left, this should be the answer.
-            guess = targets.front();
-        } else if (i == 0 && CommandLine::GetDefault()) {
-            // Use the default first guess.
-            guess = firstGuess();
-        } else {
-            guess = getNextGuess(targets, guessWords);
-        }
-#endif
         if (fPrintGuesses)
             std::println("Guess #{} is \"{}\"", i + 1, std::string_view(guess));
         // Is this the correct answer?
         if (std::string_view(guess) == std::string_view(target)) {
             // Return the answer and the number of guesses.
-            // TEST: CHANGE
-            //word_t wtemp;
-            //copyWordFrom(wtemp, *pguess);
-            //wtemp = *pguess;
-            //return { wtemp, i + 1 };
-            //return { *pguess, i + 1 };
             return { guess, i + 1 };
         }
         // Filter the targets list according to the latest guess.
@@ -559,16 +502,15 @@ static void doNextGuess(auto args)
         if ((args.size() % 2) != 0) {
             throwError("An even number of arguments is required.");
         }
-        // TEST
-        const word_t* pguess = &nonWord();
+        word_t guess = nonWord();
         wordList_t targets;
         // Find a good next guess. Show how long it takes.
         showTime([&]() {
             auto hints = makeHints(args);
             targets = filterTargets(hints, allTargets);
-            pguess = &getNextGuess(targets, allGuesses);
+            guess = getNextGuess(targets, allGuesses);
             });
-        std::println("Best guess is \"{}\"", std::string_view(*pguess));
+        std::println("Best guess is \"{}\"", std::string_view(guess));
     }
 }
 
@@ -578,8 +520,7 @@ static void doSolve(auto args)
     // Play games automatically with given target words.
     for (auto&& arg : args) {
         word_t target;
-        //checkWord(arg);
-        //wordRef_t target{ arg };
+        checkWord(arg);
         copyWordFrom(target, arg);
         std::println("Target: \"{}\"", std::string_view(target));
         solution_t s;
@@ -703,68 +644,8 @@ static void test3(auto args)
     word_t guess;
     checkWord(args[1]);
     copyWordFrom(guess, args[1]);
-    // TEST: Is this right??
     Hint hint = Hint::fromGuess(target, guess);
     hint.print();
-}
-
-// Test 4: Test some types
-static void test4(auto args)
-{
-#if 0 // no longer valid
-    // sizeof various things
-    const char* sz = "12345";   // 8 bytes (pointer)
-    std::string st = sz;        // 32 bytes
-    std::string_view sv = st;   // 16 bytes (pointer & size)
-    std::span<const char> sp = sv;    // runtime-size span: 16 bytes (pointer & size)
-    std::span<const char, 5> sp5 { sp }; // fixed-size span: 8 bytes (only a pointer)
-    wordRef_t ref{ sv };        // wordRef_t: 8 bytes (only a pointer)
-    std::println("sz:{}, st:{}, sv:{}, sp:{}, sp5:{}, ref:{}",
-        sz, st, sv, sp, sp5, ref);
-    std::println("sz:{}, st:{}, sv:{}, sp:{}, sp5:{}, ref:{}",
-        sizeof(sz), sizeof(st), sizeof(sv), sizeof(sp), sizeof(sp5), sizeof(ref));
-
-    // struct containing word_t
-    struct WW { word_t w; };
-    std::println("sizeof(WW)={}", sizeof(WW));
-    // Make sure there's no padding in an array of structs
-    static constexpr unsigned n = 8;
-    WW aww[n];
-    static_assert(sizeof(aww) == n * sizeof(WW));
-    std::println("sizeof(WW[n])={}", sizeof(aww));
-
-    // array of word_t
-    word_t aw[n];
-    for (auto&& [i,w] : std::views::enumerate(aw)) {
-        std::copy(ref.begin(), ref.end(), w.begin());
-        w[0] = char(i) + 'A';
-    }
-    for (auto&& w : aw) {
-        std::println("{}", std::string_view(w));
-    }
-    const char* pch = (const char*)aw;
-    std::string_view s(pch, n * wordLen);
-    std::println("{}", s);
-
-    // word_t and wordRef_t
-    std::println("word_t:{}", std::string_view(aw[0]));
-    wordRef_t wr = aw[0];
-    std::println("wordRef_t:{}", wr);
-
-    std::vector<word_t> v;
-    v.push_back(aw[0]); // oops, can't add to this vector :-(
-    std::println("v[0]:{}", v[0]);
-    wr = v[0];
-    std::println("wr:{}", wr);
-
-    word_t w = aw[3];
-    std::println("after assignment:{}", w);
-
-    // copy from std::string
-    word_t w2;
-    copyWordFrom(w2, w);
-    v.push_back(w2);
-#endif
 }
 
 // Run the test specified by the --test option.
@@ -774,7 +655,6 @@ static void doTest(auto args)
     case 1: test1(args); break;
     case 2: test2(args); break;
     case 3: test3(args); break;
-    case 4: test4(args); break;
     default: throwError("Invalid test number");
     }
 }
