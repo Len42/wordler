@@ -394,10 +394,8 @@ static const word_t& getNextGuess(const wordList_t& targets,
     // A good guess is one that is expected to cut down the target list as much
     // as possible.
     using score_t = unsigned long long;
-#if LOOP_IMPL
+#ifdef LOOP_IMPL
     // Implementation with loops
-    // // TODO: CHECK
-    //const word_t& bestGuess = nonWord();
     const word_t* bestGuess = &nonWord();
     score_t bestScore = std::numeric_limits<score_t>::max();
     for (auto&& guess : guessWords) {
@@ -534,7 +532,7 @@ static void doSolveAll(auto args)
 {
     for (auto&& target : allTargets) {
         solution_t s = solveWord(target, allTargets, allGuesses, false);
-        std::println("{}, {}", s.first, s.second);
+        std::println("{}, {}", std::string_view(s.first), s.second);
         std::cout.flush();
     }
 }
@@ -570,9 +568,9 @@ static void doShowStats(auto args)
             };
         });
     std::println("Min guesses: {} for \"{}\"",
-        stats.min.second, stats.min.first);
+        stats.min.second, std::string_view(stats.min.first));
     std::println("Max guesses: {} for e.g. \"{}\"",
-        stats.max.second, stats.max.first);
+        stats.max.second, std::string_view(stats.max.first));
     std::println("Mean guesses: {:.2f}",
         double(stats.totalGuesses) / double(stats.count));
     std::println("Histogram stats:");
@@ -603,7 +601,7 @@ static void test1(auto args)
         word_t word;
         checkWord(arg);
         copyWordFrom(word, arg);
-        std::println("{} {}", word, hint.match(word));
+        std::println("{} {}", std::string_view(word), hint.match(word));
     }
 }
 
@@ -622,7 +620,9 @@ static void test2(auto args)
             });
         });
     std::println("args: {}", args);
-    std::println("matches: {}", matches);
+    std::println("matches: {}",
+        matches
+        | std::views::transform([](auto&& word) { return std::string_view(word); }));
 }
 
 // Test 3: Test Hint::fromGuess()
@@ -677,10 +677,10 @@ int main(int argc, char* argv[])
             doNextGuess(args);
         }
     } catch (const std::exception& e) {
-        std::print("{}: Error: {}\n", CommandLine::GetProgName(), e.what());
+        std::println("{}: Error: {}", CommandLine::GetProgName(), e.what());
         return 1;
     } catch (...) {
-        std::print("{}: Error\n", CommandLine::GetProgName());
+        std::println("{}: Error", CommandLine::GetProgName());
         return 1;
     }
     return 0;
