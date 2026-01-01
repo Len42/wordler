@@ -12,3 +12,8 @@ using word_t = std::array<char>, wordList_t = std::vector<word_t>
 $ ./wordler.exe raise y...y
 Time: 15.39 seconds
 Best guess is "topee"
+
+using wordRef_t = const word_t&
+$ ./wordler.exe raise y...y
+Time: 15.14 seconds
+Best guess is "topee"
