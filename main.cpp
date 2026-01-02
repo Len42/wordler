@@ -127,6 +127,17 @@ static unsigned numFromStr(std::string_view s)
     return num;
 }
 
+// List of all possible answer words
+static constexpr word_t allTargets[] = {
+#include "words-target.h"
+};
+
+// List of all permitted guess words
+static constexpr word_t allGuesses[] = {
+#include "words-target.h"
+#include "words-guess.h"
+};
+
 // A guess-hint pair with a match() function
 class Hint
 {
@@ -254,86 +265,6 @@ public:
     }
 };
 
-static wordList_t allTargets;   // List of all possible answer words
-static wordList_t allGuesses;   // List of all permitted guess words
-
-// Load a list of words from a file.
-static wordList_t loadWordFile(std::string_view filename)
-{
-    wordList_t words;
-    std::ifstream file;
-    file.open(filename, std::ios::in);
-    if (file.fail()) {
-        throwError(std::format("Failed to open file {}"sv, filename).c_str());
-    }
-    std::string word;
-    while (std::getline(file, word)) {
-        checkWord(word);
-        word_t wtemp;
-        copyWordFrom(wtemp, word);
-        words.push_back(wtemp);
-    }
-    file.close();
-    return words;
-}
-
-// Load the lists of all guess and target words.
-static void loadWordLists()
-{
-    allTargets = loadWordFile("words-target.txt"sv);
-    // The list of valid guesses should include the target words too.
-    // Put the target words first. That makes it more likely that a target word
-    // will be chosen as a guess.
-    wordList_t guessWordsTemp = loadWordFile("words-guess.txt"sv);
-    allGuesses = allTargets;
-    allGuesses.append_range(guessWordsTemp);
-}
-
-// Throw an error for invalid data in a results file.
-[[noreturn]] static void throwResultsError(std::string_view line)
-{
-    throwError(std::format("Bad results data: \"{}\"", line).c_str());
-}
-
-// Load a list of solution_t from a results file (the output of --all).
-// Use stdin if filename is empty.
-static std::vector<solution_t> loadResultsFile(std::string_view filename)
-{
-    // Either open a file or use stdin.
-    bool inputFromStdin = false;
-    std::ifstream inFile;
-    if (filename.empty()) {
-        inputFromStdin = true;
-    } else {
-        inputFromStdin = false;
-        inFile.open(filename, std::ios::in);
-        if (inFile.fail()) {
-            throwError(std::format("Failed to open file {}", filename).c_str());
-        }
-    }
-    std::istream& input = inputFromStdin ? std::cin : inFile;
-    // Read and parse the file.
-    std::vector<solution_t> results;
-    std::string lineStr;
-    while (std::getline(input, lineStr)) {
-        // Each line has a guess word and a number, e.g. "atlas, 3"
-        std::string_view line = lineStr;
-        auto pos = line.find(',');
-        if (pos == std::string::npos || pos < 5)
-            throwResultsError(line);
-        std::string_view word = line.substr(0, pos);
-        checkWord(word);
-        line.remove_prefix(6);
-        while (line.starts_with(' '))
-            line.remove_prefix(1);
-        unsigned num = numFromStr(line);
-        word_t wtemp;
-        copyWordFrom(wtemp, word);
-        results.push_back(solution_t{ wtemp, num });
-    }
-    return results;
-}
-
 // Make a list of Hints from the given command line arguments.
 // Each consecutive pair of args is a guess-hint pair for a Hint.
 // Returns an unevaluated view.
@@ -347,7 +278,7 @@ static std::ranges::view auto makeHints(const std::ranges::range auto& args)
 
 // Filter a list of target words and return the ones matching a list of hints.
 static wordList_t filterTargets(const std::ranges::range auto& hints,
-    const wordList_t& targetsIn)
+    const std::ranges::range auto& targetsIn)
 {
     wordList_t targets = targetsIn
         | std::views::filter([&hints](auto&& word) {
@@ -360,7 +291,8 @@ static wordList_t filterTargets(const std::ranges::range auto& hints,
 }
 
 // Filter a list of target words, returning only the ones matching a single hint.
-static wordList_t filterTargets(const Hint& hint, const wordList_t& targetsIn)
+static wordList_t filterTargets(const Hint& hint,
+    const std::ranges::range auto& targetsIn)
 {
     return filterTargets(std::views::single(hint), targetsIn);
 }
@@ -376,8 +308,8 @@ static void removeWord(const word_t& word, wordList_t& list)
 
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
-static const word_t& getNextGuess(const wordList_t& targets,
-    const wordList_t& guessWords)
+static const word_t& getNextGuess(const std::ranges::range auto& targets,
+    const std::ranges::range auto& guessWords)
 {
     // Check a couple of special cases.
     if (targets.empty()) {
@@ -444,12 +376,12 @@ static const word_t& getNextGuess(const wordList_t& targets,
 
 // Solve for a given target word by calling getNextGuess() repeatedly.
 static solution_t solveWord(const word_t& target,
-    const wordList_t& targetWords,
-    const wordList_t& guessWords,
+    const std::ranges::range auto& targetWords,
+    const std::ranges::range auto& guessWords,
     bool fPrintGuesses)
 {
     // Keep the list of currently plausible target words in a std::vector.
-    wordList_t targets = targetWords;
+    wordList_t targets{ std::from_range, targetWords };
     // Make guesses to refine the targets list until the answer is found
     // or all guesses are used up.
     static constexpr unsigned maxGuesses = 6;
@@ -535,6 +467,51 @@ static void doSolveAll(auto args)
         std::println("{}, {}", std::string_view(s.first), s.second);
         std::cout.flush();
     }
+}
+
+// Throw an error for invalid data in a results file.
+[[noreturn]] static void throwResultsError(std::string_view line)
+{
+    throwError(std::format("Bad results data: \"{}\"", line).c_str());
+}
+
+// Load a list of solution_t from a results file (the output of --all).
+// Use stdin if filename is empty.
+static std::vector<solution_t> loadResultsFile(std::string_view filename)
+{
+    // Either open a file or use stdin.
+    bool inputFromStdin = false;
+    std::ifstream inFile;
+    if (filename.empty()) {
+        inputFromStdin = true;
+    } else {
+        inputFromStdin = false;
+        inFile.open(filename, std::ios::in);
+        if (inFile.fail()) {
+            throwError(std::format("Failed to open file {}", filename).c_str());
+        }
+    }
+    std::istream& input = inputFromStdin ? std::cin : inFile;
+    // Read and parse the file.
+    std::vector<solution_t> results;
+    std::string lineStr;
+    while (std::getline(input, lineStr)) {
+        // Each line has a guess word and a number, e.g. "atlas, 3"
+        std::string_view line = lineStr;
+        auto pos = line.find(',');
+        if (pos == std::string::npos || pos < 5)
+            throwResultsError(line);
+        std::string_view word = line.substr(0, pos);
+        checkWord(word);
+        line.remove_prefix(6);
+        while (line.starts_with(' '))
+            line.remove_prefix(1);
+        unsigned num = numFromStr(line);
+        word_t wtemp;
+        copyWordFrom(wtemp, word);
+        results.push_back(solution_t{ wtemp, num });
+    }
+    return results;
 }
 
 // Stats helper struct for std::accumulate
@@ -661,7 +638,6 @@ int main(int argc, char* argv[])
         if (CommandLine::Parse(argc, argv)) {
             return 0;
         }
-        loadWordLists();
         // Do whatever was commanded
         auto args = CommandLine::GetOtherArgs();
         if (CommandLine::GetSolve()) {
