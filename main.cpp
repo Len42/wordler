@@ -2,6 +2,7 @@
 // This source code is licensed under the MIT license - see LICENSE file.
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <fstream>
 #include <iostream>
@@ -43,23 +44,27 @@
 static constexpr size_t wordLen = 5;
 
 // word_t is a word stored as a char array
-using word_t = char[wordLen];
+using word_t = std::array<char, wordLen>;
 
-// wordRef_t is a reference to a word_t, as a std::span
-using wordRef_t = std::span<const char, wordLen>;
+// Default value for word_t that is initialized to a non-word.
+static constexpr const word_t& nonWord()
+{
+    static constexpr word_t nonWord_ = { '.', '.', '.', '.', '.' };
+    return nonWord_;
+}
 
 // wordList_t is a list of words
-using wordList_t = std::vector<std::string>;
+using wordList_t = std::vector<word_t>;
 
 // solution_t is an answer word and the number of guesses that it took to solve
-using solution_t = std::pair<std::string, unsigned>;
+using solution_t = std::pair<word_t, unsigned>;
 
 // It takes a long time to compute the first guess with no hints, and the
 // answer is always "raise". So just use that.
-static constexpr wordRef_t firstGuess()
+static constexpr const word_t& firstGuess()
 {
     static constexpr word_t firstGuess_ = { 'r', 'a', 'i', 's', 'e' };
-    return wordRef_t{ firstGuess_ };
+    return  firstGuess_;
 }
 
 // Throw an exception with a message.
@@ -104,6 +109,14 @@ static void checkHint(std::span<const char> hint)
     }
 }
 
+// Copy a word from a string into a fixed-size array.
+static void copyWordFrom(word_t& word, std::string_view wordIn)
+{
+    if (wordIn.size() != wordLen)
+        throwWordError(wordIn);
+    std::ranges::copy(wordIn, std::begin(word));
+}
+
 // Convert a numeric string to an unsigned int.
 static unsigned numFromStr(std::string_view s)
 {
@@ -123,15 +136,23 @@ private:
 
 public:
     // Construct a Hint from a guess word and a hint pattern.
-    explicit Hint(wordRef_t guessIn, wordRef_t hintIn)
+    explicit Hint(const word_t& guessIn, const word_t& hintIn)
     {
+        guess = guessIn;
+        hint = hintIn;
+    }
+
+    explicit Hint(std::string_view guessIn, std::string_view hintIn)
+    {
+        checkWord(guessIn);
         copyWordFrom(guess, guessIn);
+        checkHint(hintIn);
         copyWordFrom(hint, hintIn);
     }
 
     // Match a word against this hint.
     // Returns true if word matches this, false if not.
-    bool match(wordRef_t word) const
+    bool match(const word_t& word) const
     {
         // Keep track of letters that have been matched and ignore them later.
         bool matched[wordLen] = { false,false,false,false,false };
@@ -193,17 +214,17 @@ public:
 
     void print() const
     {
-        std::print("guess:{}", std::string_view(guess, wordLen));
-        std::println(" hint:{}", std::string_view(hint, wordLen));
+        std::print("guess:{}", std::string_view(guess));
+        std::println(" hint:{}", std::string_view(hint));
     }
 
     // Return a Hint made by comparing a guess word to a target word.
-    static Hint fromGuess(wordRef_t wTargetIn, wordRef_t wGuessIn)
+    static Hint fromGuess(const word_t& wTargetIn, const word_t& wGuessIn)
     {
-        word_t target;
-        copyWordFrom(target, wTargetIn);
-        word_t guess;
-        copyWordFrom(guess, wGuessIn);
+        // Make copies of the words so that letters can be marked off as they
+        // are matched.
+        word_t target = wTargetIn;
+        word_t guess = wGuessIn;
         // Default to '.' which means an unmatched (grey) letter
         word_t hintWord{ '.', '.', '.', '.', '.' };
         // Find exact matches (green)
@@ -231,12 +252,6 @@ public:
         }
         return Hint{ wGuessIn, hintWord };
     }
-
-private:
-    static void copyWordFrom(word_t& word, wordRef_t wordIn)
-    {
-        std::ranges::copy(wordIn, std::begin(word));
-    }
 };
 
 static wordList_t allTargets;   // List of all possible answer words
@@ -254,7 +269,9 @@ static wordList_t loadWordFile(std::string_view filename)
     std::string word;
     while (std::getline(file, word)) {
         checkWord(word);
-        words.push_back(word);
+        word_t wtemp;
+        copyWordFrom(wtemp, word);
+        words.push_back(wtemp);
     }
     file.close();
     return words;
@@ -305,13 +322,14 @@ static std::vector<solution_t> loadResultsFile(std::string_view filename)
         if (pos == std::string::npos || pos < 5)
             throwResultsError(line);
         std::string_view word = line.substr(0, pos);
-        if (word.length() != wordLen)
-            throwResultsError(line);
+        checkWord(word);
         line.remove_prefix(6);
         while (line.starts_with(' '))
             line.remove_prefix(1);
         unsigned num = numFromStr(line);
-        results.push_back(solution_t{ word, num });
+        word_t wtemp;
+        copyWordFrom(wtemp, word);
+        results.push_back(solution_t{ wtemp, num });
     }
     return results;
 }
@@ -323,9 +341,7 @@ static std::ranges::view auto makeHints(const std::ranges::range auto& args)
 {
     return args | std::views::chunk(2)
         | std::views::transform([](auto&& pattern) {
-            checkWord(pattern[0]);
-            checkHint(pattern[1]);
-            return Hint(wordRef_t{ pattern[0] }, wordRef_t{ pattern[1] });
+            return Hint(pattern[0], pattern[1]);
             });
 }
 
@@ -336,7 +352,7 @@ static wordList_t filterTargets(const std::ranges::range auto& hints,
     wordList_t targets = targetsIn
         | std::views::filter([&hints](auto&& word) {
             return std::ranges::all_of(hints, [&word](auto&& hint) {
-                return hint.match(wordRef_t{ word });
+                return hint.match(word);
                 });
             })
         | std::ranges::to<std::vector>();
@@ -350,7 +366,7 @@ static wordList_t filterTargets(const Hint& hint, const wordList_t& targetsIn)
 }
 
 // If the given word is in the given wordList_t, remove it.
-static void removeWord(std::string_view word, wordList_t& list)
+static void removeWord(const word_t& word, wordList_t& list)
 {
     auto pos = std::ranges::find(list, word);
     if (pos != list.end()) {
@@ -360,7 +376,7 @@ static void removeWord(std::string_view word, wordList_t& list)
 
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
-static std::string getNextGuess(const wordList_t& targets,
+static const word_t& getNextGuess(const wordList_t& targets,
     const wordList_t& guessWords)
 {
     // Check a couple of special cases.
@@ -370,67 +386,66 @@ static std::string getNextGuess(const wordList_t& targets,
     } else if (targets.size() <= 2) {
         // Only two possibilities remain - pick one.
         // This prevents an extra roundabout guess when there are only 2 alternatives.
-        std::string guess = targets.front();
+        const word_t& guess = targets.front();
         return guess;
     }
 
     // Test all guess words, looking for the best one.
     // A good guess is one that is expected to cut down the target list as much
     // as possible.
-    word_t wTemp{ '.','.', '.', '.', '.' };
     using score_t = unsigned long long;
-#if LOOP_IMPL
+#ifdef LOOP_IMPL
     // Implementation with loops
-    wordRef_t bestGuess{ wTemp };
+    const word_t* bestGuess = &nonWord();
     score_t bestScore = std::numeric_limits<score_t>::max();
     for (auto&& guess : guessWords) {
         // Score this guess based on how few matches it allows, over all possible
         // correct answers (targets).
         score_t score = 0;
         for (auto&& target : targets) {
-            Hint hint = Hint::fromGuess(wordRef_t{ target }, wordRef_t{ guess });
+            Hint hint = Hint::fromGuess(target, guess);
             score += std::ranges::count_if(targets, [&hint](auto&& word) {
-                return hint.match(wordRef_t{ word });
+                return hint.match(word);
                 });
         }
         if (score < bestScore) {
             bestScore = score;
-            bestGuess = wordRef_t{ guess };
+            bestGuess = &guess;
         }
     }
-    return std::string(std::from_range, bestGuess);
+    return *bestGuess;
 #else
     // Implementation with ranges and algorithms
     // (no faster but certainly uglier)
-    using guessScore_t = std::pair<wordRef_t, score_t>;
+    using guessScore_t = std::pair<const word_t*, score_t>;
     // Compute numeric scores for all possible guesses.
     auto guessScores = guessWords
         | std::views::transform([&targets](auto&& guess) {
         auto scores = targets
             | std::views::transform([&targets, &guess](auto&& target) {
-                Hint hint = Hint::fromGuess(wordRef_t{target}, wordRef_t{guess});
+                Hint hint = Hint::fromGuess(target, guess);
                 return std::ranges::count_if(targets, [&hint](auto&& word) {
-                    return hint.match(wordRef_t{ word });
+                    return hint.match(word);
                     });
                 });
         score_t score = std::accumulate(scores.begin(), scores.end(), 0ull);
-        return guessScore_t(wordRef_t{ guess }, score);
+        return guessScore_t(&guess, score);
             });
     // Choose the guess with the best (lowest) score.
     guessScore_t best = std::accumulate(guessScores.begin(), guessScores.end(),
-        guessScore_t(wTemp, std::numeric_limits<score_t>::max()),
-        [](const guessScore_t& min, const guessScore_t& next) {
+        guessScore_t(&nonWord(), std::numeric_limits<score_t>::max()),
+        [](auto&& min, auto&& next) {
             return (next.second < min.second) ? next : min;
         });
     // Return the best guess word.
-    return std::string(std::from_range, best.first);
+    return *best.first;
 #endif
 }
 
 // Solve for a given target word by calling getNextGuess() repeatedly.
-static solution_t solveWord(wordRef_t target,
-    const wordList_t& guessWords,
+static solution_t solveWord(const word_t& target,
     const wordList_t& targetWords,
+    const wordList_t& guessWords,
     bool fPrintGuesses)
 {
     // Keep the list of currently plausible target words in a std::vector.
@@ -439,25 +454,25 @@ static solution_t solveWord(wordRef_t target,
     // or all guesses are used up.
     static constexpr unsigned maxGuesses = 6;
     for (unsigned i = 0; i < maxGuesses; ++i) {
-        std::string guess;
+        word_t guess = nonWord();
         if (targets.size() == 1) {
             // Only one possibility left, this should be the answer.
             guess = targets.front();
         } else if (i == 0 && CommandLine::GetDefault()) {
             // Use the default first guess.
-            guess = std::string_view(firstGuess());
+            guess = firstGuess();
         } else {
             guess = getNextGuess(targets, guessWords);
         }
         if (fPrintGuesses)
-            std::println("Guess #{} is \"{}\"", i + 1, guess);
+            std::println("Guess #{} is \"{}\"", i + 1, std::string_view(guess));
         // Is this the correct answer?
-        if (guess == std::string_view(target)) {
+        if (std::string_view(guess) == std::string_view(target)) {
             // Return the answer and the number of guesses.
             return { guess, i + 1 };
         }
         // Filter the targets list according to the latest guess.
-        Hint hint = Hint::fromGuess(target, wordRef_t{ guess });
+        Hint hint = Hint::fromGuess(target, guess);
         targets = filterTargets(hint, targets);
         // Also remove guess from targets, if it's there, to avoid getting stuck
         // in a loop.
@@ -482,14 +497,15 @@ static void doNextGuess(auto args)
         if ((args.size() % 2) != 0) {
             throwError("An even number of arguments is required.");
         }
-        std::string guess;
+        word_t guess = nonWord();
+        wordList_t targets;
         // Find a good next guess. Show how long it takes.
         showTime([&]() {
             auto hints = makeHints(args);
-            wordList_t targets = filterTargets(hints, allTargets);
+            targets = filterTargets(hints, allTargets);
             guess = getNextGuess(targets, allGuesses);
             });
-        std::println("Best guess is \"{}\"", guess);
+        std::println("Best guess is \"{}\"", std::string_view(guess));
     }
 }
 
@@ -498,14 +514,15 @@ static void doSolve(auto args)
 {
     // Play games automatically with given target words.
     for (auto&& arg : args) {
+        word_t target;
         checkWord(arg);
-        wordRef_t target{ arg };
+        copyWordFrom(target, arg);
         std::println("Target: \"{}\"", std::string_view(target));
         solution_t s;
         showTime([&]() {
-            s = solveWord(target, allGuesses, allTargets, true);
+            s = solveWord(target, allTargets, allGuesses, true);
             });
-        std::println("Answer: \"{}\" in {} tries", s.first, s.second);
+        std::println("Answer: \"{}\" in {} tries", std::string_view(s.first), s.second);
     }
 }
 
@@ -514,8 +531,8 @@ static void doSolve(auto args)
 static void doSolveAll(auto args)
 {
     for (auto&& target : allTargets) {
-        solution_t s = solveWord(wordRef_t{ target }, allGuesses, allTargets, false);
-        std::println("{}, {}", s.first, s.second);
+        solution_t s = solveWord(target, allTargets, allGuesses, false);
+        std::println("{}, {}", std::string_view(s.first), s.second);
         std::cout.flush();
     }
 }
@@ -525,8 +542,8 @@ struct Stats
 {
     unsigned long count = 0;
     unsigned long totalGuesses = 0;
-    solution_t min = { ".....",99 };
-    solution_t max = { ".....",0 };
+    solution_t min = { nonWord(), 99};
+    solution_t max = { nonWord(), 0};
 };
 
 // Display statistics for the results produced by --all.
@@ -551,9 +568,9 @@ static void doShowStats(auto args)
             };
         });
     std::println("Min guesses: {} for \"{}\"",
-        stats.min.second, stats.min.first);
+        stats.min.second, std::string_view(stats.min.first));
     std::println("Max guesses: {} for e.g. \"{}\"",
-        stats.max.second, stats.max.first);
+        stats.max.second, std::string_view(stats.max.first));
     std::println("Mean guesses: {:.2f}",
         double(stats.totalGuesses) / double(stats.count));
     std::println("Histogram stats:");
@@ -578,10 +595,13 @@ static void test1(auto args)
     std::println("hint: {} {}", args[0], args[1]);
     checkWord(args[0]);
     checkHint(args[1]);
-    Hint hint(wordRef_t{ args[0] }, wordRef_t{ args[1] });
+    Hint hint(args[0], args[1]);
     hint.print();
-    for (auto&& word : args | std::views::drop(2)) {
-        std::println("{} {}", word, hint.match(wordRef_t{ word }));
+    for (auto&& arg : args | std::views::drop(2)) {
+        word_t word;
+        checkWord(arg);
+        copyWordFrom(word, arg);
+        std::println("{} {}", std::string_view(word), hint.match(word));
     }
 }
 
@@ -596,11 +616,13 @@ static void test2(auto args)
     auto hints = makeHints(args);
     auto matches = allTargets | std::views::filter([&hints](auto&& word) {
         return std::ranges::all_of(hints, [&word](auto&& hint) {
-            return hint.match(wordRef_t{ word });
+            return hint.match(word);
             });
         });
     std::println("args: {}", args);
-    std::println("matches: {}", matches);
+    std::println("matches: {}",
+        matches
+        | std::views::transform([](auto&& word) { return std::string_view(word); }));
 }
 
 // Test 3: Test Hint::fromGuess()
@@ -612,9 +634,13 @@ static void test3(auto args)
         throwError("Requires 2 args");
     }
     std::println("Target: {} Guess: {}", args[0], args[1]);
+    word_t target;
     checkWord(args[0]);
+    copyWordFrom(target, args[0]);
+    word_t guess;
     checkWord(args[1]);
-    Hint hint = Hint::fromGuess(wordRef_t{ args[0] }, wordRef_t{ args[1] });
+    copyWordFrom(guess, args[1]);
+    Hint hint = Hint::fromGuess(target, guess);
     hint.print();
 }
 
@@ -651,10 +677,10 @@ int main(int argc, char* argv[])
             doNextGuess(args);
         }
     } catch (const std::exception& e) {
-        std::print("{}: Error: {}\n", CommandLine::GetProgName(), e.what());
+        std::println("{}: Error: {}", CommandLine::GetProgName(), e.what());
         return 1;
     } catch (...) {
-        std::print("{}: Error\n", CommandLine::GetProgName());
+        std::println("{}: Error", CommandLine::GetProgName());
         return 1;
     }
     return 0;
