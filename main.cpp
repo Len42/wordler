@@ -254,40 +254,16 @@ public:
     }
 };
 
-static wordList_t allTargets;   // List of all possible answer words
-static wordList_t allGuesses;   // List of all permitted guess words
+// List of all possible answer words
+static constexpr word_t allTargets[] = {
+#include "words-target.h"
+};
 
-// Load a list of words from a file.
-static wordList_t loadWordFile(std::string_view filename)
-{
-    wordList_t words;
-    std::ifstream file;
-    file.open(filename, std::ios::in);
-    if (file.fail()) {
-        throwError(std::format("Failed to open file {}"sv, filename).c_str());
-    }
-    std::string word;
-    while (std::getline(file, word)) {
-        checkWord(word);
-        word_t wtemp;
-        copyWordFrom(wtemp, word);
-        words.push_back(wtemp);
-    }
-    file.close();
-    return words;
-}
-
-// Load the lists of all guess and target words.
-static void loadWordLists()
-{
-    allTargets = loadWordFile("words-target.txt"sv);
-    // The list of valid guesses should include the target words too.
-    // Put the target words first. That makes it more likely that a target word
-    // will be chosen as a guess.
-    wordList_t guessWordsTemp = loadWordFile("words-guess.txt"sv);
-    allGuesses = allTargets;
-    allGuesses.append_range(guessWordsTemp);
-}
+// List of all permitted guess words
+static constexpr word_t allGuesses[] = {
+#include "words-target.h"
+#include "words-guess.h"
+};
 
 // Throw an error for invalid data in a results file.
 [[noreturn]] static void throwResultsError(std::string_view line)
@@ -347,7 +323,7 @@ static std::ranges::view auto makeHints(const std::ranges::range auto& args)
 
 // Filter a list of target words and return the ones matching a list of hints.
 static wordList_t filterTargets(const std::ranges::range auto& hints,
-    const wordList_t& targetsIn)
+    const std::ranges::range auto& targetsIn)
 {
     wordList_t targets = targetsIn
         | std::views::filter([&hints](auto&& word) {
@@ -360,7 +336,8 @@ static wordList_t filterTargets(const std::ranges::range auto& hints,
 }
 
 // Filter a list of target words, returning only the ones matching a single hint.
-static wordList_t filterTargets(const Hint& hint, const wordList_t& targetsIn)
+static wordList_t filterTargets(const Hint& hint,
+    const std::ranges::range auto& targetsIn)
 {
     return filterTargets(std::views::single(hint), targetsIn);
 }
@@ -376,8 +353,8 @@ static void removeWord(const word_t& word, wordList_t& list)
 
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
-static const word_t& getNextGuess(const wordList_t& targets,
-    const wordList_t& guessWords)
+static const word_t& getNextGuess(const std::ranges::range auto& targets,
+    const std::ranges::range auto& guessWords)
 {
     // Check a couple of special cases.
     if (targets.empty()) {
@@ -444,12 +421,12 @@ static const word_t& getNextGuess(const wordList_t& targets,
 
 // Solve for a given target word by calling getNextGuess() repeatedly.
 static solution_t solveWord(const word_t& target,
-    const wordList_t& targetWords,
-    const wordList_t& guessWords,
+    const std::ranges::range auto& targetWords,
+    const std::ranges::range auto& guessWords,
     bool fPrintGuesses)
 {
     // Keep the list of currently plausible target words in a std::vector.
-    wordList_t targets = targetWords;
+    wordList_t targets{ std::from_range, targetWords };
     // Make guesses to refine the targets list until the answer is found
     // or all guesses are used up.
     static constexpr unsigned maxGuesses = 6;
@@ -661,7 +638,6 @@ int main(int argc, char* argv[])
         if (CommandLine::Parse(argc, argv)) {
             return 0;
         }
-        loadWordLists();
         // Do whatever was commanded
         auto args = CommandLine::GetOtherArgs();
         if (CommandLine::GetSolve()) {
