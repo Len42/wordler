@@ -26,6 +26,12 @@
     <ClInclude Include="timer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="words-guess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="words-target.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="results.txt" />

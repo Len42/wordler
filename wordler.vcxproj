@@ -176,6 +176,8 @@ copy $(TargetPath) $(SolutionDir)$(TargetFileName)</Command>
   <ItemGroup>
     <ClInclude Include="cmdline.h" />
     <ClInclude Include="timer.h" />
+    <ClInclude Include="words-guess.h" />
+    <ClInclude Include="words-target.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="results.txt" />
