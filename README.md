@@ -2,6 +2,8 @@
 
 **C++ program to solve [Wordle](https://www.nytimes.com/games/wordle/index.html)**
 
+_For more detailed info, [see my web site](https://lenp.net/dev/wordler/)._
+
 ## How to Build
 
 `wordler.sln` is the project file to build wordler using Microsoft Visual Studio on Windows.
@@ -66,4 +68,4 @@ wordler can be used in other ways. The `--help` option will display all of the c
 
 ## How It Works
 
-_Info forthcoming..._
+_[See my web site for details.](https://lenp.net/dev/wordler/)_
