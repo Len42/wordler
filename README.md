@@ -12,6 +12,7 @@ The source code is in:
 - `main.cpp`
 - `cmdline.h`
 - `timer.h`
+- `words-guess.h`, `words-target.h` – word lists
 
 The code uses some C++23 features.
 
