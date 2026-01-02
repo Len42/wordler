@@ -127,6 +127,17 @@ static unsigned numFromStr(std::string_view s)
     return num;
 }
 
+// List of all possible answer words
+static constexpr word_t allTargets[] = {
+#include "words-target.h"
+};
+
+// List of all permitted guess words
+static constexpr word_t allGuesses[] = {
+#include "words-target.h"
+#include "words-guess.h"
+};
+
 // A guess-hint pair with a match() function
 class Hint
 {
@@ -253,62 +264,6 @@ public:
         return Hint{ wGuessIn, hintWord };
     }
 };
-
-// List of all possible answer words
-static constexpr word_t allTargets[] = {
-#include "words-target.h"
-};
-
-// List of all permitted guess words
-static constexpr word_t allGuesses[] = {
-#include "words-target.h"
-#include "words-guess.h"
-};
-
-// Throw an error for invalid data in a results file.
-[[noreturn]] static void throwResultsError(std::string_view line)
-{
-    throwError(std::format("Bad results data: \"{}\"", line).c_str());
-}
-
-// Load a list of solution_t from a results file (the output of --all).
-// Use stdin if filename is empty.
-static std::vector<solution_t> loadResultsFile(std::string_view filename)
-{
-    // Either open a file or use stdin.
-    bool inputFromStdin = false;
-    std::ifstream inFile;
-    if (filename.empty()) {
-        inputFromStdin = true;
-    } else {
-        inputFromStdin = false;
-        inFile.open(filename, std::ios::in);
-        if (inFile.fail()) {
-            throwError(std::format("Failed to open file {}", filename).c_str());
-        }
-    }
-    std::istream& input = inputFromStdin ? std::cin : inFile;
-    // Read and parse the file.
-    std::vector<solution_t> results;
-    std::string lineStr;
-    while (std::getline(input, lineStr)) {
-        // Each line has a guess word and a number, e.g. "atlas, 3"
-        std::string_view line = lineStr;
-        auto pos = line.find(',');
-        if (pos == std::string::npos || pos < 5)
-            throwResultsError(line);
-        std::string_view word = line.substr(0, pos);
-        checkWord(word);
-        line.remove_prefix(6);
-        while (line.starts_with(' '))
-            line.remove_prefix(1);
-        unsigned num = numFromStr(line);
-        word_t wtemp;
-        copyWordFrom(wtemp, word);
-        results.push_back(solution_t{ wtemp, num });
-    }
-    return results;
-}
 
 // Make a list of Hints from the given command line arguments.
 // Each consecutive pair of args is a guess-hint pair for a Hint.
@@ -512,6 +467,51 @@ static void doSolveAll(auto args)
         std::println("{}, {}", std::string_view(s.first), s.second);
         std::cout.flush();
     }
+}
+
+// Throw an error for invalid data in a results file.
+[[noreturn]] static void throwResultsError(std::string_view line)
+{
+    throwError(std::format("Bad results data: \"{}\"", line).c_str());
+}
+
+// Load a list of solution_t from a results file (the output of --all).
+// Use stdin if filename is empty.
+static std::vector<solution_t> loadResultsFile(std::string_view filename)
+{
+    // Either open a file or use stdin.
+    bool inputFromStdin = false;
+    std::ifstream inFile;
+    if (filename.empty()) {
+        inputFromStdin = true;
+    } else {
+        inputFromStdin = false;
+        inFile.open(filename, std::ios::in);
+        if (inFile.fail()) {
+            throwError(std::format("Failed to open file {}", filename).c_str());
+        }
+    }
+    std::istream& input = inputFromStdin ? std::cin : inFile;
+    // Read and parse the file.
+    std::vector<solution_t> results;
+    std::string lineStr;
+    while (std::getline(input, lineStr)) {
+        // Each line has a guess word and a number, e.g. "atlas, 3"
+        std::string_view line = lineStr;
+        auto pos = line.find(',');
+        if (pos == std::string::npos || pos < 5)
+            throwResultsError(line);
+        std::string_view word = line.substr(0, pos);
+        checkWord(word);
+        line.remove_prefix(6);
+        while (line.starts_with(' '))
+            line.remove_prefix(1);
+        unsigned num = numFromStr(line);
+        word_t wtemp;
+        copyWordFrom(wtemp, word);
+        results.push_back(solution_t{ wtemp, num });
+    }
+    return results;
 }
 
 // Stats helper struct for std::accumulate
