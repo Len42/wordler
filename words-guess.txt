@@ -9945,7 +9945,6 @@ sisal
 sises
 sista
 sists
-sitar
 sitch
 sited
 sites
