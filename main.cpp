@@ -24,6 +24,7 @@
 #define CMDLINE_OPTIONS(ITEM) \
     /* ITEM(id, nameShort, nameLong, valType, defVal, help) */ \
     ITEM(Init, i, init, std::string, "raise", "Initial guess word (default \"raise\", may be empty)") \
+    ITEM(HardMode, h, hard, bool, false, "Hard mode - guesses must match hints") \
     ITEM(Solve, s, solve, bool, false, "Solve for the given answers") \
     ITEM(SolveAll, a, all, bool, false, "Solve all possible answers - slow!") \
     ITEM(ShowStats, x, stats, bool, false, "Display stats from a results file") \
