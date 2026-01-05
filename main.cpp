@@ -24,7 +24,7 @@
 #define CMDLINE_OPTIONS(ITEM) \
     /* ITEM(id, nameShort, nameLong, valType, defVal, help) */ \
     ITEM(Init, i, init, std::string, "raise", "Initial guess word (default \"raise\", may be empty)") \
-    ITEM(HardMode, h, hard, bool, false, "Hard mode - guesses must match hints") \
+    ITEM(HardMode, d, hard, bool, false, "Hard mode - guesses must match hints") \
     ITEM(Solve, s, solve, bool, false, "Solve for the given answers") \
     ITEM(SolveAll, a, all, bool, false, "Solve all possible answers - slow!") \
     ITEM(ShowStats, x, stats, bool, false, "Display stats from a results file") \
@@ -390,11 +390,14 @@ static solution_t solveWord(const word_t& target,
     const std::ranges::range auto& guessWords,
     bool fPrintGuesses)
 {
-    // Keep the list of currently plausible target words in a std::vector.
+    // Keep the lists of currently plausible target and guess words in a std::vector.
     wordList_t targets{ std::from_range, targetWords };
+    wordList_t guesses{ std::from_range, guessWords };
     // Make guesses to refine the targets list until the answer is found
     // or all guesses are used up.
-    static constexpr unsigned maxGuesses = 6;
+    // For "hard mode", allow more guesses because it's not guaranteed to
+    // succeed every time.
+    unsigned maxGuesses = CommandLine::GetHardMode() ? 99 : 6;
     for (unsigned i = 0; i < maxGuesses; ++i) {
         word_t guess = nonWord();
         if (targets.size() == 1) {
@@ -404,7 +407,7 @@ static solution_t solveWord(const word_t& target,
             // Use the default first guess.
             guess = getFirstGuess();
         } else {
-            guess = getNextGuess(targets, guessWords);
+            guess = getNextGuess(targets, guesses);
         }
         if (fPrintGuesses)
             std::println("Guess #{} is \"{}\"", i + 1, std::string_view(guess));
@@ -416,6 +419,12 @@ static solution_t solveWord(const word_t& target,
         // Filter the targets list according to the latest guess.
         Hint hint = Hint::fromGuess(target, guess);
         targets = filterTargets(hint, targets);
+        // In hard mode, the guesses must also be limited by the hints.
+        // This is a bit inefficient when _not_ in hard mode because it copies
+        // the entire guess list unnecessarily.
+        if (CommandLine::GetHardMode()) {
+            guesses = filterTargets(hint, guesses);
+        }
         // Also remove guess from targets, if it's there, to avoid getting stuck
         // in a loop.
         removeWord(guess, targets);
@@ -440,12 +449,20 @@ static void doNextGuess(auto args)
             throwError("An even number of arguments is required.");
         }
         word_t guess = nonWord();
-        wordList_t targets;
         // Find a good next guess. Show how long it takes.
         showTime([&]() {
             auto hints = makeHints(args);
-            targets = filterTargets(hints, allTargets);
-            guess = getNextGuess(targets, allGuesses);
+            wordList_t targets = filterTargets(hints, allTargets);
+            // In "hard mode" the list of guess words must be filtered by the
+            // hints seen so far. This is a bit inefficient when _not_ in hard
+            // mode because it copies the entire guess list unnecessarily.
+            wordList_t guessList;
+            if (CommandLine::GetHardMode()) {
+                guessList = filterTargets(hints, allGuesses);
+            } else {
+                guessList = allGuesses | std::ranges::to<std::vector>();
+            }
+            guess = getNextGuess(targets, guessList);
             });
         std::println("Best guess is \"{}\"", std::string_view(guess));
     }
