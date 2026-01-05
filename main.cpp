@@ -23,7 +23,7 @@
     "\n\nExample: wordler raise y.gy. thumb yg..."
 #define CMDLINE_OPTIONS(ITEM) \
     /* ITEM(id, nameShort, nameLong, valType, defVal, help) */ \
-    ITEM(Default, d, default, bool, true, "Use a default first guess (default true)") \
+    ITEM(Init, i, init, std::string, "raise", "Initial guess word (default \"raise\", may be empty)") \
     ITEM(Solve, s, solve, bool, false, "Solve for the given answers") \
     ITEM(SolveAll, a, all, bool, false, "Solve all possible answers - slow!") \
     ITEM(ShowStats, x, stats, bool, false, "Display stats from a results file") \
@@ -58,14 +58,6 @@ using wordList_t = std::vector<word_t>;
 
 // solution_t is an answer word and the number of guesses that it took to solve
 using solution_t = std::pair<word_t, unsigned>;
-
-// It takes a long time to compute the first guess with no hints, and the
-// answer is always "raise". So just use that.
-static constexpr const word_t& firstGuess()
-{
-    static constexpr word_t firstGuess_ = { 'r', 'a', 'i', 's', 'e' };
-    return  firstGuess_;
-}
 
 // Throw an exception with a message.
 [[noreturn]] static void throwError(const char* message)
@@ -125,6 +117,23 @@ static unsigned numFromStr(std::string_view s)
     if (ec != std::errc() || (ptr - s.data()) != s.size())
         throwError(std::format("Bad number: \"{}\"", s).c_str());
     return num;
+}
+
+// Was an initial guess specified on the command line?
+static bool hasFirstGuess()
+{
+    return !CommandLine::GetInit().empty();
+}
+
+// It takes a long time to compute the initial guess with no hints, so start
+// with a given word. Default="raise" which is what it will always guess anyway.
+// If empty, compute the first guess from scratch.
+static word_t getFirstGuess()
+{
+    word_t word;
+    checkWord(CommandLine::GetInit());
+    copyWordFrom(word, CommandLine::GetInit());
+    return word;
 }
 
 // List of all possible answer words
@@ -390,9 +399,9 @@ static solution_t solveWord(const word_t& target,
         if (targets.size() == 1) {
             // Only one possibility left, this should be the answer.
             guess = targets.front();
-        } else if (i == 0 && CommandLine::GetDefault()) {
+        } else if (i == 0 && hasFirstGuess()) {
             // Use the default first guess.
-            guess = firstGuess();
+            guess = getFirstGuess();
         } else {
             guess = getNextGuess(targets, guessWords);
         }
@@ -421,9 +430,9 @@ static solution_t solveWord(const word_t& target,
 // Display the word to guess next, based on the hints given on thte command line.
 static void doNextGuess(auto args)
 {
-    if (args.empty() && CommandLine::GetDefault()) {
+    if (args.empty() && hasFirstGuess() ) {
         // Use the default first guess.
-        std::println("First guess is \"{}\"", std::string_view(firstGuess()));
+        std::println("First guess is \"{}\"", std::string_view(getFirstGuess()));
     } else {
         // The command line args are the hints given so far.
         if ((args.size() % 2) != 0) {
