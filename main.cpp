@@ -9,6 +9,7 @@
 #include <limits>
 #include <numeric>
 #include <print>
+#include <random>
 #include <ranges>
 #include <span>
 #include <string_view>
@@ -25,6 +26,7 @@
     /* ITEM(id, nameShort, nameLong, valType, defVal, help) */ \
     ITEM(Init, i, init, std::string, "raise", "Initial guess word (default \"raise\", may be empty)") \
     ITEM(HardMode, d, hard, bool, false, "Hard mode - guesses must match hints") \
+    ITEM(Play, p, play, bool, false, "Play a game") \
     ITEM(Solve, s, solve, bool, false, "Solve for the given answers") \
     ITEM(SolveAll, a, all, bool, false, "Solve all possible answers - slow!") \
     ITEM(ShowStats, x, stats, bool, false, "Display stats from a results file") \
@@ -56,6 +58,9 @@ static constexpr const word_t& nonWord()
 
 // wordList_t is a list of words
 using wordList_t = std::vector<word_t>;
+
+// Number of guesses allowed
+static constexpr unsigned maxGuesses = 6;
 
 // solution_t is an answer word and the number of guesses that it took to solve
 using solution_t = std::pair<word_t, unsigned>;
@@ -148,6 +153,15 @@ static constexpr word_t allGuesses[] = {
 #include "words-guess.h"
 };
 
+static word_t getRandomTarget()
+{
+    static std::random_device randDev;
+    static std::mt19937_64 randGen(randDev());
+    static std::uniform_int_distribution<uint64_t> randDist =
+        std::uniform_int_distribution<uint64_t>(1, std::size(allTargets));
+    return allTargets[randDist(randGen)];
+}
+
 // A guess-hint pair with a match() function
 class Hint
 {
@@ -170,6 +184,10 @@ public:
         checkHint(hintIn);
         copyWordFrom(hint, hintIn);
     }
+
+    const word_t& getGuess(this auto&& self) { return self.guess; }
+
+    const word_t& getHint(this auto&& self) { return self.hint; }
 
     // Match a word against this hint.
     // Returns true if word matches this, false if not.
@@ -397,8 +415,8 @@ static solution_t solveWord(const word_t& target,
     // or all guesses are used up.
     // For "hard mode", allow more guesses because it's not guaranteed to
     // succeed every time.
-    unsigned maxGuesses = CommandLine::GetHardMode() ? 99 : 6;
-    for (unsigned i = 0; i < maxGuesses; ++i) {
+    unsigned maxGuessesT = CommandLine::GetHardMode() ? 99 : maxGuesses;
+    for (unsigned i = 0; i < maxGuessesT; ++i) {
         word_t guess = nonWord();
         if (targets.size() == 1) {
             // Only one possibility left, this should be the answer.
@@ -434,7 +452,7 @@ static solution_t solveWord(const word_t& target,
         }
     }
     throwError(std::format("Answer \"{}\" was not found in {} tries.",
-        std::string_view(target), maxGuesses).c_str());
+        std::string_view(target), maxGuessesT).c_str());
 }
 
 // Display the word to guess next, based on the hints given on thte command line.
@@ -466,6 +484,56 @@ static void doNextGuess(auto args)
             });
         std::println("Best guess is \"{}\"", std::string_view(guess));
     }
+}
+
+// Play a game
+static void doPlayGame(auto args)
+{
+    word_t answer = getRandomTarget();
+    //*DEBUG*/std::println("{}", std::string_view(answer));
+    for (unsigned i = 1; i <= maxGuesses; ++i) {
+        std::string guessS;
+        std::print("Guess #{}: ", i);
+        std::getline(std::cin, guessS);
+        //checkWord(guessS);
+        // Kludgy way to check if guess is a valid guess word
+        // TODO: Better?
+        if (guessS.length() != wordLen) {
+            // TODO: Should have a loop to re-enter the guess
+            throwWordError(guessS);
+        }
+        word_t guess;
+        copyWordFrom(guess, guessS);
+        Hint hint = Hint::fromGuess(guess, guess);
+        // TODO: Hard mode
+        wordList_t matches = filterTargets(hint, allGuesses);
+        if (matches.empty()) {
+            // TODO: Should have a loop to re-enter the guess
+            /*DEBUG*/std::println("not found");
+            throwWordError(guess);
+        }
+        // DEBUG
+        {
+            if (matches.size() != 1) {
+                throwError("ERROR 1");
+            }
+            if (guessS != std::string_view(matches.front())) {
+                throwError("ERROR 2");
+            }
+        }
+        //
+        if (guessS == std::string_view(answer)) {
+            std::println("Correct! Answer \"{}\" was found in {} tries.",
+                std::string_view(answer), i);
+            return;
+        } else {
+            //hint.print();
+            Hint hint = Hint::fromGuess(answer, guess);
+            std::println("          {}", std::string_view(hint.getHint()));
+        }
+    }
+    std::println("Answer \"{}\" was not found in {} tries.",
+        std::string_view(answer), maxGuesses);
 }
 
 // Show the solution for the target word given on the command line.
@@ -667,7 +735,9 @@ int main(int argc, char* argv[])
         }
         // Do whatever was commanded
         auto args = CommandLine::GetOtherArgs();
-        if (CommandLine::GetSolve()) {
+        if (CommandLine::GetPlay()) {
+            doPlayGame(args);
+        } else if (CommandLine::GetSolve()) {
             doSolve(args);
         } else if (CommandLine::GetSolveAll()) {
             doSolveAll(args);
