@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <numeric>
+#include <optional>
 #include <print>
 #include <random>
 #include <ranges>
@@ -486,50 +487,59 @@ static void doNextGuess(auto args)
     }
 }
 
+// Read a guess word from an input stream. Repeat until a valid guess is entered.
+static std::optional<word_t> getInputGuess(std::istream& input,
+    const std::string_view prompt,
+    const std::ranges::range auto& guessWords)
+{
+    for (;;) {
+        std::string sWord;
+        std::cout << prompt;
+        if (!std::getline(input, sWord)) {
+            // input error or EOF
+            return std::nullopt;
+        }
+        if (sWord.length() == wordLen) {
+            // Kludgy way to check if guess is a valid guess word
+            word_t word;
+            copyWordFrom(word, sWord);
+            Hint hint = Hint::fromGuess(word, word);
+            wordList_t matches = filterTargets(hint, guessWords);
+            if (std::size(matches) == 1
+                && std::string_view(matches.front()) == sWord)
+            {
+                return word;
+            }
+        }
+        std::println("Invalid guess - try again");
+    }
+}
+
 // Play a game
 static void doPlayGame(auto args)
 {
     word_t answer = getRandomTarget();
-    //*DEBUG*/std::println("{}", std::string_view(answer));
+    wordList_t guesses{ std::from_range, allGuesses };
     for (unsigned i = 1; i <= maxGuesses; ++i) {
-        std::string guessS;
-        std::print("Guess #{}: ", i);
-        std::getline(std::cin, guessS);
-        //checkWord(guessS);
-        // Kludgy way to check if guess is a valid guess word
-        // TODO: Better?
-        if (guessS.length() != wordLen) {
-            // TODO: Should have a loop to re-enter the guess
-            throwWordError(guessS);
+        auto guessOpt = getInputGuess(std::cin,
+            std::format("Guess #{}: ", i),
+            guesses);
+        if (!guessOpt) {
+            // Error, or gave up
+            return;
         }
-        word_t guess;
-        copyWordFrom(guess, guessS);
-        Hint hint = Hint::fromGuess(guess, guess);
-        // TODO: Hard mode
-        wordList_t matches = filterTargets(hint, allGuesses);
-        if (matches.empty()) {
-            // TODO: Should have a loop to re-enter the guess
-            /*DEBUG*/std::println("not found");
-            throwWordError(guess);
-        }
-        // DEBUG
-        {
-            if (matches.size() != 1) {
-                throwError("ERROR 1");
-            }
-            if (guessS != std::string_view(matches.front())) {
-                throwError("ERROR 2");
-            }
-        }
-        //
-        if (guessS == std::string_view(answer)) {
+        word_t guess = guessOpt.value();
+        if (std::string_view(guess) == std::string_view(answer)) {
+            // Done!
             std::println("Correct! Answer \"{}\" was found in {} tries.",
                 std::string_view(answer), i);
             return;
-        } else {
-            //hint.print();
-            Hint hint = Hint::fromGuess(answer, guess);
-            std::println("          {}", std::string_view(hint.getHint()));
+        }
+        Hint hint = Hint::fromGuess(answer, guess);
+        //hint.print();
+        std::println("          {}", std::string_view(hint.getHint()));
+        if (CommandLine::GetHardMode()) {
+            guesses = filterTargets(hint, guesses);
         }
     }
     std::println("Answer \"{}\" was not found in {} tries.",
