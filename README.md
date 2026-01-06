@@ -46,7 +46,7 @@ And so on, until the game is over.
 wordler can be used in other ways. The `--help` option will display all of the command-line options:
 
     $ ./wordler --help
-    Usage: wordler [-i|--init=<value>] [-d|--hard] [-s|--solve] [-a|--all] [-x|--stats] [-t|--test=<value>] [-h|--help] <args...>
+    Usage: wordler [-i|--init=<value>] [-d|--hard] [-p|--play] [-s|--solve] [-a|--all] [-x|--stats] [-t|--test=<value>] [-h|--help] <args...>
 
     Wordle solver - Given a series of hints, compute which word to guess next
 
@@ -54,6 +54,7 @@ wordler can be used in other ways. The `--help` option will display all of the c
 
         -i, --init=<value>    Initial guess word (default "raise", may be empty)
         -d, --hard            Hard mode - guesses must match hints
+        -p, --play            Play a game
         -s, --solve           Solve for the given answers
         -a, --all             Solve all possible answers - slow!
         -x, --stats           Display stats from a results file
