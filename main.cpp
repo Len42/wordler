@@ -151,7 +151,7 @@ static constexpr word_t allTargets[] = {
 // List of all permitted guess words
 static constexpr word_t allGuesses[] = {
 #include "words-target.h"
-//#include "words-guess.h"
+#include "words-guess.h"
 };
 
 static word_t getRandomTarget()
@@ -326,15 +326,6 @@ static wordList_t filterTargets(const Hint& hint,
     return filterTargets(std::views::single(hint), targetsIn);
 }
 
-// If the given word is in the given wordList_t, remove it.
-static void removeWord(const word_t& word, wordList_t& list)
-{
-    auto pos = std::ranges::find(list, word);
-    if (pos != list.end()) {
-        list.erase(pos);
-    }
-}
-
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
 static const word_t& getNextGuess(const std::ranges::range auto& targets,
@@ -348,6 +339,8 @@ static const word_t& getNextGuess(const std::ranges::range auto& targets,
         // Only two possibilities remain - pick one.
         // This prevents an extra roundabout guess when there are only 2 alternatives.
         const word_t& guess = targets.front();
+        ///*DEBUG*/std::println("getNextGuess: picking {} from {}",
+        //    std::string_view(guess), targets);
         return guess;
     }
 
@@ -444,9 +437,6 @@ static solution_t solveWord(const word_t& target,
         if (CommandLine::GetHardMode()) {
             guesses = filterTargets(hint, guesses);
         }
-        // Also remove guess from targets, if it's there, to avoid getting stuck
-        // in a loop.
-        removeWord(guess, targets);
         if (targets.empty()) {
             // Oops, no matching words at all!
             throwError("No matching words found.");
