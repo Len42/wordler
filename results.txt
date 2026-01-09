@@ -1,3 +1,5 @@
+oomph, 4
+sitar, 2
 atlas, 3
 cigar, 3
 rebut, 3
@@ -298,7 +300,7 @@ fibre, 3
 comma, 4
 foray, 4
 scare, 3
-stair, 2
+stair, 3
 black, 4
 squad, 4
 royal, 3
@@ -1567,7 +1569,7 @@ shiny, 4
 elate, 4
 resin, 3
 whole, 3
-hunch, 4
+hunch, 5
 pixel, 4
 polar, 4
 hotel, 4
@@ -2182,7 +2184,7 @@ magma, 4
 roost, 2
 woman, 4
 thong, 4
-punch, 5
+punch, 4
 pasty, 4
 downy, 4
 knead, 4
