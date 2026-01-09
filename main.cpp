@@ -326,15 +326,6 @@ static wordList_t filterTargets(const Hint& hint,
     return filterTargets(std::views::single(hint), targetsIn);
 }
 
-// If the given word is in the given wordList_t, remove it.
-static void removeWord(const word_t& word, wordList_t& list)
-{
-    auto pos = std::ranges::find(list, word);
-    if (pos != list.end()) {
-        list.erase(pos);
-    }
-}
-
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
 static const word_t& getNextGuess(const std::ranges::range auto& targets,
@@ -444,9 +435,6 @@ static solution_t solveWord(const word_t& target,
         if (CommandLine::GetHardMode()) {
             guesses = filterTargets(hint, guesses);
         }
-        // Also remove guess from targets, if it's there, to avoid getting stuck
-        // in a loop.
-        removeWord(guess, targets);
         if (targets.empty()) {
             // Oops, no matching words at all!
             throwError("No matching words found.");
