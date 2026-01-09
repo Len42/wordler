@@ -339,8 +339,6 @@ static const word_t& getNextGuess(const std::ranges::range auto& targets,
         // Only two possibilities remain - pick one.
         // This prevents an extra roundabout guess when there are only 2 alternatives.
         const word_t& guess = targets.front();
-        ///*DEBUG*/std::println("getNextGuess: picking {} from {}",
-        //    std::string_view(guess), targets);
         return guess;
     }
 
