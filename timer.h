@@ -6,12 +6,14 @@
 #include <concepts>
 #include <print>
 
-void showTime(std::invocable auto func)
+void showTime(bool print, std::invocable auto func)
 {
     using clock = std::chrono::steady_clock;
     clock::time_point tStart = clock::now();
     func();
     clock::duration dt = clock::now() - tStart;
     double time = (double)dt.count() * (double)clock::period::num / (double)clock::period::den;
-    std::println("Time: {:.02f} seconds", time);
+    if (print) {
+        std::println("Time: {:.02f} seconds", time);
+    }
 }
