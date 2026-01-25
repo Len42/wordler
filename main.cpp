@@ -255,8 +255,7 @@ public:
 
     void print() const
     {
-        std::print("{}", std::string_view(guess));
-        std::println(" {}", std::string_view(hint));
+        std::println("{} {}", std::string_view(guess), std::string_view(hint));
     }
 
     // Return a Hint made by comparing a guess word to a target word.
