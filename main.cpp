@@ -164,21 +164,21 @@ static word_t getRandomTarget()
     return allTargets[randDist(randGen)];
 }
 
-template< class... Args >
+template<class... Args>
 static void lprint(std::format_string<Args...> fmtVerbose, Args&&... args)
 {
     std::print(CommandLine::GetVerbose() ? fmtVerbose : "{}",
         std::forward<Args>(args)...);
 }
 
-template< class... Args >
+template<class... Args>
 static void lprintln(std::format_string<Args...> fmtVerbose, Args&&... args)
 {
     std::println(CommandLine::GetVerbose() ? fmtVerbose : "{}",
         std::forward<Args>(args)...);
 }
 
-template< class... Args >
+template<class... Args>
 static void lvprint(std::format_string<Args...> fmt, Args&&... args)
 {
     if (CommandLine::GetVerbose()) {
@@ -186,7 +186,7 @@ static void lvprint(std::format_string<Args...> fmt, Args&&... args)
     }
 }
 
-template< class... Args >
+template<class... Args>
 static void lvprintln(std::format_string<Args...> fmt, Args&&... args)
 {
     if (CommandLine::GetVerbose()) {
