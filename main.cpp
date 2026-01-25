@@ -155,6 +155,7 @@ static constexpr word_t allGuesses[] = {
 #include "words-guess.h"
 };
 
+// Select an answer word randomly
 static word_t getRandomTarget()
 {
     static std::random_device randDev;
@@ -164,6 +165,7 @@ static word_t getRandomTarget()
     return allTargets[randDist(randGen)];
 }
 
+// Formatted printing that uses a fancier format if the --verbose option is given
 template<class... Args>
 static void lprint(std::format_string<Args...> fmtVerbose, Args&&... args)
 {
@@ -171,6 +173,7 @@ static void lprint(std::format_string<Args...> fmtVerbose, Args&&... args)
         std::forward<Args>(args)...);
 }
 
+// Formatted printing that uses a fancier format if the --verbose option is given
 template<class... Args>
 static void lprintln(std::format_string<Args...> fmtVerbose, Args&&... args)
 {
@@ -178,6 +181,7 @@ static void lprintln(std::format_string<Args...> fmtVerbose, Args&&... args)
         std::forward<Args>(args)...);
 }
 
+// Formatted printing that only prints if the --verbose option is given
 template<class... Args>
 static void lvprint(std::format_string<Args...> fmt, Args&&... args)
 {
@@ -186,6 +190,7 @@ static void lvprint(std::format_string<Args...> fmt, Args&&... args)
     }
 }
 
+// Formatted printing that only prints if the --verbose option is given
 template<class... Args>
 static void lvprintln(std::format_string<Args...> fmt, Args&&... args)
 {
