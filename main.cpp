@@ -466,7 +466,7 @@ static void doNextGuess(auto args)
         }
         word_t guess = nonWord();
         // Find a good next guess. Show how long it takes.
-        showTime(CommandLine::GetVerbose(), [&]() {
+        double t = runTime([&]() {
             auto hints = makeHints(args);
             wordList_t targets = filterTargets(hints, allTargets);
             // In "hard mode" the list of guess words must be filtered by the
@@ -481,6 +481,7 @@ static void doNextGuess(auto args)
             guess = getNextGuess(targets, guessList);
             });
         if (CommandLine::GetVerbose()) {
+            std::println("Time: {:.02f} seconds", t);
             std::println("Best guess is \"{}\"", std::string_view(guess));
         } else {
             std::println("{}", std::string_view(guess));
@@ -566,10 +567,11 @@ static void doSolve(auto args)
             std::println("Target: \"{}\"", std::string_view(target));
         }
         solution_t s;
-        showTime(CommandLine::GetVerbose(), [&]() {
+        double t = runTime([&]() {
             s = solveWord(target, allTargets, allGuesses, true);
             });
         if (CommandLine::GetVerbose()) {
+            std::println("Time: {:.02f} seconds", t);
             std::println("Answer: \"{}\" in {} tries",
                 std::string_view(s.first), s.second);
         } else {
