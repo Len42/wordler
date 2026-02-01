@@ -20,6 +20,8 @@ The code uses some C++23 features.
 
 ## How to Use
 
+_There’s a simpler way to run `wordler` – [see here for details](https://lenp.net/dev/wordler/#use)_
+
 After entering a guess into [Wordle](https://www.nytimes.com/games/wordle/index.html), run wordler with your guesses and Wordle’s hints as arguments. It will compute a good word for your next guess. For example, if your first guess is “learn” and Wordle displays this:
 
 ![screenshot of a Wordle hint](hint1.png)
@@ -43,31 +45,11 @@ And so on, until the game is over.
 
 ### Other Options
 
-wordler can be used in other ways. The `--help` option will display all of the command-line options:
+wordler can be used in other ways. The `--help` option will display all of the command-line options.
 
-    $ ./wordler --help
-    Usage: wordler [-i|--init=<value>] [-d|--hard] [-p|--play] [-s|--solve] [-a|--all] [-x|--stats] [-t|--test=<value>] [-h|--help] <args...>
+_[See here for more info.](https://lenp.net/dev/wordler/#use)_
 
-    Wordle solver - Given a series of hints, compute which word to guess next
-
-    Example: wordler raise y.gy. thumb yg...
-
-        -i, --init=<value>    Initial guess word (default "raise", may be empty)
-        -d, --hard            Hard mode - guesses must match hints
-        -p, --play            Play a game
-        -s, --solve           Solve for the given answers
-        -a, --all             Solve all possible answers - slow!
-        -x, --stats           Display stats from a results file
-        -t, --test=<value>    Test mode
-        -h, --help            Display this message
-        <args...>             Other arguments depend on the options given.
-    With no options, args are the known hints. Each hint is a pair of args:
-        First is the word guessed (5 letters)
-        Second is the Wordle hint ('g' for green, 'y' for yellow, '.' for grey)
-    --solve: args are a list of answer words to solve
-    --stats: arg is a filename containing output from --all (or stdin if omitted)
-    --test: args depend on which test is selected.
 
 ## How It Works
 
-_[See my web site for details.](https://lenp.net/dev/wordler/)_
+_[See my web site for details.](https://lenp.net/dev/wordler/#works)_
