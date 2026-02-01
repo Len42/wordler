@@ -31,6 +31,7 @@
     ITEM(Solve, s, solve, bool, false, "Solve for the given answers") \
     ITEM(SolveAll, a, all, bool, false, "Solve all possible answers - slow!") \
     ITEM(ShowStats, x, stats, bool, false, "Display stats from a results file") \
+    ITEM(Verbose, v, verbose, bool, true, "Display more output (default true)") \
     ITEM(Test, t, test, unsigned, 0, "Test mode")
 #define CMDLINE_ALLOW_ARGS true
 #define CMDLINE_ARGS_DESCRIPTION \
@@ -154,6 +155,7 @@ static constexpr word_t allGuesses[] = {
 #include "words-guess.h"
 };
 
+// Select an answer word randomly
 static word_t getRandomTarget()
 {
     static std::random_device randDev;
@@ -161,6 +163,40 @@ static word_t getRandomTarget()
     static std::uniform_int_distribution<uint64_t> randDist =
         std::uniform_int_distribution<uint64_t>(1, std::size(allTargets));
     return allTargets[randDist(randGen)];
+}
+
+// Formatted printing that uses a fancier format if the --verbose option is given
+template<class... Args>
+static void lprint(std::format_string<Args...> fmtVerbose, Args&&... args)
+{
+    std::print(CommandLine::GetVerbose() ? fmtVerbose : "{}",
+        std::forward<Args>(args)...);
+}
+
+// Formatted printing that uses a fancier format if the --verbose option is given
+template<class... Args>
+static void lprintln(std::format_string<Args...> fmtVerbose, Args&&... args)
+{
+    std::println(CommandLine::GetVerbose() ? fmtVerbose : "{}",
+        std::forward<Args>(args)...);
+}
+
+// Formatted printing that only prints if the --verbose option is given
+template<class... Args>
+static void lvprint(std::format_string<Args...> fmt, Args&&... args)
+{
+    if (CommandLine::GetVerbose()) {
+        std::print(fmt, std::forward<Args>(args)...);
+    }
+}
+
+// Formatted printing that only prints if the --verbose option is given
+template<class... Args>
+static void lvprintln(std::format_string<Args...> fmt, Args&&... args)
+{
+    if (CommandLine::GetVerbose()) {
+        std::println(fmt, std::forward<Args>(args)...);
+    }
 }
 
 // A guess-hint pair with a match() function
@@ -254,8 +290,7 @@ public:
 
     void print() const
     {
-        std::print("guess:{}", std::string_view(guess));
-        std::println(" hint:{}", std::string_view(hint));
+        std::println("{} {}", std::string_view(guess), std::string_view(hint));
     }
 
     // Return a Hint made by comparing a guess word to a target word.
@@ -419,8 +454,10 @@ static solution_t solveWord(const word_t& target,
         } else {
             guess = getNextGuess(targets, guesses);
         }
-        if (fPrintGuesses)
-            std::println("Guess #{} is \"{}\"", i + 1, std::string_view(guess));
+        if (fPrintGuesses) {
+            lvprint("Guess #{} is ", i + 1);
+            lprintln("\"{}\"", std::string_view(guess));
+        }
         // Is this the correct answer?
         if (std::string_view(guess) == std::string_view(target)) {
             // Return the answer and the number of guesses.
@@ -449,7 +486,7 @@ static void doNextGuess(auto args)
 {
     if (args.empty() && hasFirstGuess() ) {
         // Use the default first guess.
-        std::println("First guess is \"{}\"", std::string_view(getFirstGuess()));
+        lprintln("First guess is \"{}\"", std::string_view(getFirstGuess()));
     } else {
         // The command line args are the hints given so far.
         if ((args.size() % 2) != 0) {
@@ -457,7 +494,7 @@ static void doNextGuess(auto args)
         }
         word_t guess = nonWord();
         // Find a good next guess. Show how long it takes.
-        showTime([&]() {
+        double t = runTime([&]() {
             auto hints = makeHints(args);
             wordList_t targets = filterTargets(hints, allTargets);
             // In "hard mode" the list of guess words must be filtered by the
@@ -471,18 +508,19 @@ static void doNextGuess(auto args)
             }
             guess = getNextGuess(targets, guessList);
             });
-        std::println("Best guess is \"{}\"", std::string_view(guess));
+        lvprintln("Time: {:.02f} seconds", t);
+        lprintln("Best guess is \"{}\"", std::string_view(guess));
     }
 }
 
 // Read a guess word from an input stream. Repeat until a valid guess is entered.
 static std::optional<word_t> getInputGuess(std::istream& input,
-    const std::string_view prompt,
+    unsigned i,
     const std::ranges::range auto& guessWords)
 {
     for (;;) {
         std::string sWord;
-        std::cout << prompt;
+        lvprint("Guess #{}: ", i);
         if (!std::getline(input, sWord)) {
             // input error or EOF
             return std::nullopt;
@@ -509,9 +547,7 @@ static void doPlayGame(auto args)
     word_t answer = getRandomTarget();
     wordList_t guesses{ std::from_range, allGuesses };
     for (unsigned i = 1; i <= maxGuesses; ++i) {
-        auto guessOpt = getInputGuess(std::cin,
-            std::format("Guess #{}: ", i),
-            guesses);
+        auto guessOpt = getInputGuess(std::cin, i, guesses);
         if (!guessOpt) {
             // Error, or gave up
             return;
@@ -519,18 +555,17 @@ static void doPlayGame(auto args)
         word_t guess = guessOpt.value();
         if (std::string_view(guess) == std::string_view(answer)) {
             // Done!
-            std::println("Correct! Answer \"{}\" was found in {} tries.",
+            lvprintln("Correct! Answer \"{}\" was found in {} tries.",
                 std::string_view(answer), i);
             return;
         }
         Hint hint = Hint::fromGuess(answer, guess);
-        //hint.print();
-        std::println("          {}", std::string_view(hint.getHint()));
+        lprintln("          {}", std::string_view(hint.getHint()));
         if (CommandLine::GetHardMode()) {
             guesses = filterTargets(hint, guesses);
         }
     }
-    std::println("Answer \"{}\" was not found in {} tries.",
+    lvprintln("Answer \"{}\" was not found in {} tries.",
         std::string_view(answer), maxGuesses);
 }
 
@@ -542,12 +577,14 @@ static void doSolve(auto args)
         word_t target;
         checkWord(arg);
         copyWordFrom(target, arg);
-        std::println("Target: \"{}\"", std::string_view(target));
+        lvprintln("Target: \"{}\"", std::string_view(target));
         solution_t s;
-        showTime([&]() {
+        double t = runTime([&]() {
             s = solveWord(target, allTargets, allGuesses, true);
             });
-        std::println("Answer: \"{}\" in {} tries", std::string_view(s.first), s.second);
+        lvprintln("Time: {:.02f} seconds", t);
+        lvprint("Answer: \"{}\" in ", std::string_view(s.first));
+        lprintln("{} tries", s.second);
     }
 }
 
@@ -658,15 +695,16 @@ static void doShowStats(auto args)
 // example args: raise .y..g geese evade amaze fubar exact blend
 static void test1(auto args)
 {
-    std::println("test1");
     if (args.size() < 3) {
         throwError("Requires 3+ args");
     }
-    std::println("hint: {} {}", args[0], args[1]);
+    lvprintln("hint: {} {}", args[0], args[1]);
     checkWord(args[0]);
     checkHint(args[1]);
     Hint hint(args[0], args[1]);
-    hint.print();
+    if (CommandLine::GetVerbose()) {
+        hint.print();
+    }
     for (auto&& arg : args | std::views::drop(2)) {
         word_t word;
         checkWord(arg);
@@ -679,31 +717,32 @@ static void test1(auto args)
 // example args: raise .y..g grill y..y.
 static void test2(auto args)
 {
-    std::println("test2");
     if ((args.size() % 2) == 1) {
         throwError("Requires an even number of args");
     }
     auto hints = makeHints(args);
-    auto matches = allTargets | std::views::filter([&hints](auto&& word) {
-        return std::ranges::all_of(hints, [&word](auto&& hint) {
-            return hint.match(word);
-            });
-        });
-    std::println("args: {}", args);
-    std::println("matches: {}",
-        matches
-        | std::views::transform([](auto&& word) { return std::string_view(word); }));
+    auto matches =
+        allTargets
+        | std::views::filter([&hints](auto&& word) {
+            return std::ranges::all_of(hints, [&word](auto&& hint) {
+                return hint.match(word);
+                });
+            })
+        | std::views::transform([](auto&& word) { return std::string_view(word); })
+        | std::ranges::to<std::vector>(); // convert to vector to get size()
+    lvprintln("args: {}", args);
+    lprintln("{} matches", matches.size());
+    lprintln("{}", matches);
 }
 
 // Test 3: Test Hint::fromGuess()
 // example args: -t 3 grade guess
 static void test3(auto args)
 {
-    std::println("test3");
     if (args.size() != 2) {
         throwError("Requires 2 args");
     }
-    std::println("Target: {} Guess: {}", args[0], args[1]);
+    lvprintln("Target: {} Guess: {}", args[0], args[1]);
     word_t target;
     checkWord(args[0]);
     copyWordFrom(target, args[0]);
