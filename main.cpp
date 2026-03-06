@@ -363,7 +363,7 @@ static wordList_t filterTargets(const Hint& hint,
 
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
-static const word_t& getNextGuess(const std::ranges::range auto& targets,
+static const word_t getNextGuess(const std::ranges::range auto& targets,
     const std::ranges::range auto& guessWords)
 {
     // Check a couple of special cases.
@@ -381,10 +381,10 @@ static const word_t& getNextGuess(const std::ranges::range auto& targets,
     // A good guess is one that is expected to cut down the target list as much
     // as possible.
     using score_t = unsigned long long;
+    using guessScore_t = std::pair<word_t, score_t>;
 #ifdef LOOP_IMPL
     // Implementation with loops
-    const word_t* bestGuess = &nonWord();
-    score_t bestScore = std::numeric_limits<score_t>::max();
+    guessScore_t best = guessScore_t(nonWord(), std::numeric_limits<score_t>::max());
     for (auto&& guess : guessWords) {
         // Score this guess based on how few matches it allows, over all possible
         // correct answers (targets).
@@ -395,16 +395,13 @@ static const word_t& getNextGuess(const std::ranges::range auto& targets,
                 return hint.match(word);
                 });
         }
-        if (score < bestScore) {
-            bestScore = score;
-            bestGuess = &guess;
+        if (score < best.second) {
+            best = guessScore_t(guess, score);
         }
     }
-    return *bestGuess;
 #else
     // Implementation with ranges and algorithms
     // (no faster but certainly uglier)
-    using guessScore_t = std::pair<const word_t*, score_t>;
     // Compute numeric scores for all possible guesses.
     auto guessScores = guessWords
         | std::views::transform([&targets](auto&& guess) {
@@ -416,17 +413,17 @@ static const word_t& getNextGuess(const std::ranges::range auto& targets,
                     });
                 });
         score_t score = std::accumulate(scores.begin(), scores.end(), 0ull);
-        return guessScore_t(&guess, score);
+        return guessScore_t(guess, score);
             });
     // Choose the guess with the best (lowest) score.
     guessScore_t best = std::accumulate(guessScores.begin(), guessScores.end(),
-        guessScore_t(&nonWord(), std::numeric_limits<score_t>::max()),
+        guessScore_t(nonWord(), std::numeric_limits<score_t>::max()),
         [](auto&& min, auto&& next) {
             return (next.second < min.second) ? next : min;
         });
-    // Return the best guess word.
-    return *best.first;
 #endif
+
+    return best.first;
 }
 
 // Solve for a given target word by calling getNextGuess() repeatedly.
