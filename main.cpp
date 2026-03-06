@@ -134,7 +134,7 @@ static bool hasFirstGuess()
 }
 
 // It takes a long time to compute the initial guess with no hints, so start
-// with a given word. Default="raise" which is what it will always guess anyway.
+// with a given word. Default="raise" which is what it would pick first.
 // If empty, compute the first guess from scratch.
 static word_t getFirstGuess()
 {
@@ -361,9 +361,12 @@ static wordList_t filterTargets(const Hint& hint,
     return filterTargets(std::views::single(hint), targetsIn);
 }
 
-// Choose the best word to guess next, given that the correct answer is in a
-// list of target words.
-static const word_t getNextGuess(const std::ranges::range auto& targets,
+using score_t = unsigned long long;
+using guessScore_t = std::pair<word_t, score_t>;
+
+// Evaluate all guesses against a list of targets and return the best guess.
+// Helper routine for getNextGuess().
+static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
     const std::ranges::range auto& guessWords)
 {
     // Check a couple of special cases.
@@ -374,14 +377,12 @@ static const word_t getNextGuess(const std::ranges::range auto& targets,
         // Only two possibilities remain - pick one.
         // This prevents an extra roundabout guess when there are only 2 alternatives.
         const word_t& guess = targets.front();
-        return guess;
+        return { guess, 0 };
     }
 
     // Test all guess words, looking for the best one.
     // A good guess is one that is expected to cut down the target list as much
     // as possible.
-    using score_t = unsigned long long;
-    using guessScore_t = std::pair<word_t, score_t>;
 #ifdef LOOP_IMPL
     // Implementation with loops
     guessScore_t best = guessScore_t(nonWord(), std::numeric_limits<score_t>::max());
@@ -423,7 +424,25 @@ static const word_t getNextGuess(const std::ranges::range auto& targets,
         });
 #endif
 
-    return best.first;
+    return best;
+}
+
+// Choose the best word to guess next, given that the correct answer is in a
+// list of target words.
+static word_t getNextGuess(const std::ranges::range auto& targets,
+    const std::ranges::range auto& guessWords)
+{
+    // guess1 is the best guess that could possibly be a correct answer,
+    // guess2 is the best guess of any valid word.
+    guessScore_t guess1 = getNextGuessSub(targets, targets);
+    guessScore_t guess2 =  getNextGuessSub(targets, guessWords);
+    // Compare scores of guess1 and guess2, giving a slight preference to a
+    // guess that could fortuitously be the correct answer.
+    static constexpr double preference = 1.1;
+    const guessScore_t& guess =
+        (guess1.second <= score_t(preference * guess2.second + 1))
+            ? guess1 : guess2;
+    return guess.first;
 }
 
 // Solve for a given target word by calling getNextGuess() repeatedly.
