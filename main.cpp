@@ -383,9 +383,11 @@ static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
     // Test all guess words, looking for the best one.
     // A good guess is one that is expected to cut down the target list as much
     // as possible.
+    static constexpr guessScore_t worstGuess =
+        guessScore_t(nonWord(), std::numeric_limits<score_t>::max());
 #ifdef LOOP_IMPL
     // Implementation with loops
-    guessScore_t best = guessScore_t(nonWord(), std::numeric_limits<score_t>::max());
+    guessScore_t best = worstGuess;
     for (auto&& guess : guessWords) {
         // Score this guess based on how few matches it allows, over all possible
         // correct answers (targets).
@@ -395,9 +397,6 @@ static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
             score += std::ranges::count_if(targets, [&hint](auto&& word) {
                 return hint.match(word);
                 });
-        }
-        if (score < best.second) {
-            best = guessScore_t(guess, score);
         }
     }
 #else
@@ -417,11 +416,11 @@ static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
         return guessScore_t(guess, score);
             });
     // Choose the guess with the best (lowest) score.
-    guessScore_t best = std::accumulate(guessScores.begin(), guessScores.end(),
-        guessScore_t(nonWord(), std::numeric_limits<score_t>::max()),
-        [](auto&& min, auto&& next) {
-            return (next.second < min.second) ? next : min;
-        });
+    guessScore_t best =
+        std::accumulate(guessScores.begin(), guessScores.end(), worstGuess,
+            [](auto&& min, auto&& next) {
+                return (next.second < min.second) ? next : min;
+            });
 #endif
 
     return best;
