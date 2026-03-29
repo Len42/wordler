@@ -768,6 +768,29 @@ static void test3(auto args)
     hint.print();
 }
 
+// Test 4: Count letter frequencies in all answers
+static void test4(auto args)
+{
+    using count_t = std::pair<char, unsigned>;
+    std::array<count_t, 'z'-'a'+1> counts;
+    for (auto&& [count, ch] : std::views::zip(counts, std::views::iota('a', 'z'+1))) {
+        count = { ch, 0 };
+    }
+    for (auto&& word : allTargets) {
+        for (char ch : word) {
+            if (ch >= 'a' && ch <= 'z') {
+                ++counts[ch - 'a'].second;
+            } else {
+                throwError("Weird character found");
+            }
+        }
+    }
+    std::ranges::sort(counts, std::greater(), &count_t::second);
+    for (auto&& [count, rank] : std::views::zip(counts, std::views::iota(1))) {
+        std::println("{}\t{}\t{} ", rank, count.first, count.second);
+    }
+}
+
 // Run the test specified by the --test option.
 static void doTest(auto args)
 {
@@ -775,6 +798,7 @@ static void doTest(auto args)
     case 1: test1(args); break;
     case 2: test2(args); break;
     case 3: test3(args); break;
+    case 4: test4(args); break;
     default: throwError("Invalid test number");
     }
 }
