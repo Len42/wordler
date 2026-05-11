@@ -398,6 +398,9 @@ static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
                 return hint.match(word);
                 });
         }
+        if (score < best.second) {
+            best = guessScore_t(guess, score);
+        }
     }
 #else
     // Implementation with ranges and algorithms
@@ -434,7 +437,7 @@ static word_t getNextGuess(const std::ranges::range auto& targets,
     // guess1 is the best guess that could possibly be a correct answer,
     // guess2 is the best guess of any valid word.
     guessScore_t guess1 = getNextGuessSub(targets, targets);
-    guessScore_t guess2 =  getNextGuessSub(targets, guessWords);
+    guessScore_t guess2 = getNextGuessSub(targets, guessWords);
     // Compare scores of guess1 and guess2, giving a slight preference to a
     // guess that could fortuitously be the correct answer.
     static constexpr double preference = 1.1;
