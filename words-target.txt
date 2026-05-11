@@ -2321,3 +2321,6 @@ shred
 hydra
 gunky
 oasis
+carom
+cubit
+toady
