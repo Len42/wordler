@@ -383,9 +383,11 @@ static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
     // Test all guess words, looking for the best one.
     // A good guess is one that is expected to cut down the target list as much
     // as possible.
+    static constexpr guessScore_t worstGuess =
+        guessScore_t(nonWord(), std::numeric_limits<score_t>::max());
 #ifdef LOOP_IMPL
     // Implementation with loops
-    guessScore_t best = guessScore_t(nonWord(), std::numeric_limits<score_t>::max());
+    guessScore_t best = worstGuess;
     for (auto&& guess : guessWords) {
         // Score this guess based on how few matches it allows, over all possible
         // correct answers (targets).
@@ -417,11 +419,11 @@ static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
         return guessScore_t(guess, score);
             });
     // Choose the guess with the best (lowest) score.
-    guessScore_t best = std::accumulate(guessScores.begin(), guessScores.end(),
-        guessScore_t(nonWord(), std::numeric_limits<score_t>::max()),
-        [](auto&& min, auto&& next) {
-            return (next.second < min.second) ? next : min;
-        });
+    guessScore_t best =
+        std::accumulate(guessScores.begin(), guessScores.end(), worstGuess,
+            [](auto&& min, auto&& next) {
+                return (next.second < min.second) ? next : min;
+            });
 #endif
 
     return best;
@@ -435,7 +437,7 @@ static word_t getNextGuess(const std::ranges::range auto& targets,
     // guess1 is the best guess that could possibly be a correct answer,
     // guess2 is the best guess of any valid word.
     guessScore_t guess1 = getNextGuessSub(targets, targets);
-    guessScore_t guess2 =  getNextGuessSub(targets, guessWords);
+    guessScore_t guess2 = getNextGuessSub(targets, guessWords);
     // Compare scores of guess1 and guess2, giving a slight preference to a
     // guess that could fortuitously be the correct answer.
     static constexpr double preference = 1.1;
@@ -769,6 +771,29 @@ static void test3(auto args)
     hint.print();
 }
 
+// Test 4: Count letter frequencies in all answers
+static void test4(auto args)
+{
+    using count_t = std::pair<char, unsigned>;
+    std::array<count_t, 'z'-'a'+1> counts;
+    for (auto&& [count, ch] : std::views::zip(counts, std::views::iota('a', 'z'+1))) {
+        count = { ch, 0 };
+    }
+    for (auto&& word : allTargets) {
+        for (char ch : word) {
+            if (ch >= 'a' && ch <= 'z') {
+                ++counts[ch - 'a'].second;
+            } else {
+                throwError("Weird character found");
+            }
+        }
+    }
+    std::ranges::sort(counts, std::greater(), &count_t::second);
+    for (auto&& [count, rank] : std::views::zip(counts, std::views::iota(1))) {
+        std::println("{}\t{}\t{} ", rank, count.first, count.second);
+    }
+}
+
 // Run the test specified by the --test option.
 static void doTest(auto args)
 {
@@ -776,6 +801,7 @@ static void doTest(auto args)
     case 1: test1(args); break;
     case 2: test2(args); break;
     case 3: test3(args); break;
+    case 4: test4(args); break;
     default: throwError("Invalid test number");
     }
 }
