@@ -151,6 +151,7 @@ static constexpr word_t allTargets[] = {
 
 // List of all permitted guess words
 static constexpr word_t allGuesses[] = {
+#include "words-target.h"
 #include "words-guess.h"
 };
 
