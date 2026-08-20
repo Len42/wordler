@@ -754,21 +754,23 @@ static void test2(auto args)
 }
 
 // Test 3: Test Hint::fromGuess()
-// example args: -t 3 grade guess
+// example args: grade guess guest
 static void test3(auto args)
 {
-    if (args.size() != 2) {
-        throwError("Requires 2 args");
+    if (args.size() < 2) {
+        throwError("Requires 2+ args");
     }
-    lvprintln("Target: {} Guess: {}", args[0], args[1]);
+    lvprintln("Target: {}", args[0]);
     word_t target;
     checkWord(args[0]);
     copyWordFrom(target, args[0]);
-    word_t guess;
-    checkWord(args[1]);
-    copyWordFrom(guess, args[1]);
-    Hint hint = Hint::fromGuess(target, guess);
-    hint.print();
+    for (auto&& guessS : args | std::views::drop(1)) {
+        word_t guess;
+        checkWord(guessS);
+        copyWordFrom(guess, guessS);
+        Hint hint = Hint::fromGuess(target, guess);
+        hint.print();
+    }
 }
 
 // Test 4: Count letter frequencies in all answers
