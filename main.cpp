@@ -794,6 +794,52 @@ static void test4(auto args)
     }
 }
 
+static constexpr char hintChars[3] = {'.', 'y', 'g'};
+
+static std::ranges::view auto getAllHints()
+{
+    return std::views::cartesian_product(hintChars, hintChars, hintChars, hintChars, hintChars)
+        | std::views::transform([](auto&& tup) {
+                return word_t{ std::get<0>(tup), std::get<1>(tup), std::get<2>(tup), std::get<3>(tup), std::get<4>(tup) };
+            });
+}
+
+// Test 5: TODO Explore the gamespace.
+static void test5(auto args)
+{
+#if true
+    word_t guess = getFirstGuess();
+    size_t cAnyMatches = 0;
+    for (const word_t& wHint : getAllHints()) {
+        Hint hint(guess, wHint);
+        auto matches = filterTargets(hint, allTargets);
+        size_t cMatches = matches.size();
+        if (cMatches != 0) {
+            ++cAnyMatches;
+            std::println("{} {}", std::string_view(wHint), cMatches);
+        }
+    }
+    std::println("{} of {} hints have some matching targets", cAnyMatches, getAllHints().size());
+#endif
+
+#if false
+    static constexpr word_t nonTargetGuesses[] = {
+    #include "words-guess.h"
+    };
+    //word_t guess = getFirstGuess();
+    //word_t wHint { '.','.','.','.','g' };
+    //Hint hint { guess, wHint};
+    //auto hints = std::views::single(hint);
+    std::string_view aHints[] = { "raise", "...gg", "pulse", "..ygg" };
+    lvprintln("hints: {}", aHints);
+    auto hints = makeHints(aHints);
+    auto matches1 = filterTargets(hints, allTargets);
+    lprintln("Targets: {}", matches1.size());
+    auto matches2 = filterTargets(hints, nonTargetGuesses);
+    lprintln("Others: {}", matches2.size());
+#endif
+}
+
 // Run the test specified by the --test option.
 static void doTest(auto args)
 {
@@ -802,6 +848,7 @@ static void doTest(auto args)
     case 2: test2(args); break;
     case 3: test3(args); break;
     case 4: test4(args); break;
+    case 5: test5(args); break;
     default: throwError("Invalid test number");
     }
 }
