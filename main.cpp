@@ -796,6 +796,8 @@ static void test4(auto args)
     }
 }
 
+#if true // test5
+
 static constexpr char hintChars[3] = {'.', 'y', 'g'};
 
 static std::ranges::view auto getAllHints()
@@ -804,6 +806,28 @@ static std::ranges::view auto getAllHints()
         | std::views::transform([](auto&& tup) {
                 return word_t{ std::get<0>(tup), std::get<1>(tup), std::get<2>(tup), std::get<3>(tup), std::get<4>(tup) };
             });
+}
+
+static unsigned indexFromHint(const word_t& w)
+{
+    unsigned n = 0;
+    for (auto&& ch : w) {
+        unsigned nCh = (ch == 'g' ? 2 : (ch == 'y' ? 1 : 0));
+        n = 3 * n + nCh;
+    }
+    return n;
+}
+
+static word_t hintFromIndex(unsigned n)
+{
+    word_t hint;
+    for (unsigned i = 0; i < wordLen; ++i) {
+        unsigned nCh = n % 3;
+        n /= 3;
+        char ch = (nCh == 2 ? 'g' : (nCh == 1 ? 'y' : '.'));
+        hint[wordLen - 1 - i] = ch;
+    }
+    return hint;
 }
 
 // Test 5: TODO Explore the gamespace.
@@ -816,9 +840,16 @@ static void test5(auto args)
         Hint hint(guess, wHint);
         auto matches = filterTargets(hint, allTargets);
         size_t cMatches = matches.size();
-        if (cMatches != 0) {
+        unsigned i = indexFromHint(wHint);
+        auto wHint2 = hintFromIndex(i);
+        if (wHint != wHint2) {
+            std::println("{} {}", std::string_view(wHint), std::string_view(wHint2));
+            throwError("oops");
+        }
+        /*if (cMatches != 0)*/ {
             ++cAnyMatches;
-            std::println("{} {}", std::string_view(wHint), cMatches);
+            std::println("{} {} {}",
+                std::string_view(wHint), i, std::string_view(wHint2), cMatches);
         }
     }
     std::println("{} of {} hints have some matching targets", cAnyMatches, getAllHints().size());
@@ -842,6 +873,8 @@ static void test5(auto args)
 #endif
 }
 
+#endif // test5
+
 // Run the test specified by the --test option.
 static void doTest(auto args)
 {
@@ -850,7 +883,9 @@ static void doTest(auto args)
     case 2: test2(args); break;
     case 3: test3(args); break;
     case 4: test4(args); break;
+#if true // test5
     case 5: test5(args); break;
+#endif // test5
     default: throwError("Invalid test number");
     }
 }
