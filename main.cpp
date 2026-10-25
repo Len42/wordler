@@ -1,6 +1,9 @@
 // Copyright (c) Len Popp
 // This source code is licensed under the MIT license - see LICENSE file.
 
+// TEMP
+#define TEST5 true
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -16,6 +19,9 @@
 #include <string_view>
 #include <string>
 #include <vector>
+#if TEST5
+#include <map>
+#endif
 
 #include "timer.h"
 
@@ -54,7 +60,7 @@ using word_t = std::array<char, wordLen>;
 // Default value for word_t that is initialized to a non-word.
 static constexpr const word_t& nonWord()
 {
-    static constexpr word_t nonWord_ = { '.', '.', '.', '.', '.' };
+    static constexpr word_t nonWord_ = { '?', '?', '?', '?', '?' };
     return nonWord_;
 }
 
@@ -796,7 +802,7 @@ static void test4(auto args)
     }
 }
 
-#if true // test5
+#if TEST5
 
 static constexpr char hintChars[3] = {'.', 'y', 'g'};
 
@@ -830,10 +836,94 @@ static word_t hintFromIndex(unsigned n)
     return hint;
 }
 
+class Guess
+{
+public: // private:
+    word_t guess = nonWord();
+    // map hint -> next Guess
+    std::map<word_t, Guess> mpHintGuess;
+
+public:
+    explicit Guess(const word_t& guessIn) : guess(guessIn) { }
+
+    explicit Guess(std::string_view guessIn)
+    {
+        checkWord(guessIn);
+        copyWordFrom(guess, guessIn);
+    }
+
+    Guess& addChild(const word_t& hint, const word_t& guess)
+    {
+        Guess node(guess);
+        auto [it, f] = mpHintGuess.insert({ hint, node });
+        if (!f) {
+            throwError("Guess::addChild: insert() failed");
+        }
+        return it->second;
+    }
+
+    Guess& addChild(std::string_view hintS, std::string_view guessS)
+    {
+        word_t hint;
+        copyWordFrom(hint, hintS);
+        checkHint(hint);
+        word_t guess;
+        copyWordFrom(guess, guessS);
+        checkWord(guess);
+        return addChild(hint, guess);
+    }
+
+    // TODO: is it OK to return a const?
+    const Guess* findChild(const word_t& hint) const
+    {
+        auto it = mpHintGuess.find(hint);
+        if (it == mpHintGuess.end()) {
+            return nullptr;
+        }
+        return &it->second;
+    }
+
+    const Guess* findChild(std::string_view hintS) const
+    {
+        word_t hint;
+        copyWordFrom(hint, hintS);
+        checkHint(hint);
+        return findChild(hint);
+    }
+};
+
+// Root node maps empty hint to the default first guess.
+static Guess guessRoot = Guess(nonWord());
+
+static void addSolutionToTree(const word_t& target)
+{
+
+}
+
 // Test 5: TODO Explore the gamespace.
 static void test5(auto args)
 {
 #if true
+    Guess& firstGuess = guessRoot.addChild("....."sv, "raise"sv);
+    firstGuess.addChild("....y"sv, "holey"sv);
+    firstGuess.addChild("g...."sv, "boody"sv);
+
+    const Guess* start = guessRoot.findChild("....."sv);
+    if (start == nullptr) {
+        throwError("Guess::findChild: start node not found");
+    }
+ 
+    std::string_view testHint = "....y"sv; // "g...."sv; // "..g.y"sv; // 
+    std::print("{} -> ", testHint);
+    const Guess* guessFound = start->findChild(testHint);
+    if (guessFound) {
+        std::println("{}", std::string_view(guessFound->guess));
+    } else {
+        std::println("ERROR: Not found");
+    }
+#endif
+
+#if false
     word_t guess = getFirstGuess();
     size_t cAnyMatches = 0;
     for (const word_t& wHint : getAllHints()) {
@@ -873,7 +963,7 @@ static void test5(auto args)
 #endif
 }
 
-#endif // test5
+#endif // TEST5
 
 // Run the test specified by the --test option.
 static void doTest(auto args)
@@ -883,9 +973,9 @@ static void doTest(auto args)
     case 2: test2(args); break;
     case 3: test3(args); break;
     case 4: test4(args); break;
-#if true // test5
+#if TEST5
     case 5: test5(args); break;
-#endif // test5
+#endif // TEST5
     default: throwError("Invalid test number");
     }
 }
