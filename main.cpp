@@ -482,9 +482,10 @@ static solution_t solveWord(const word_t& target,
         // Call a callback function for each guess.
         guessCallback(solution);
         // Is this the correct answer?
-        if (std::string_view(guess) == std::string_view(target)) {
+        //if (std::string_view(guess) == std::string_view(target)) {
+        if (guess == target) {
             // Return the answer and the number of guesses.
-            return solution; // TODO { guess, i + 1 };
+            return solution;
         }
         // Filter the targets list according to the latest guess.
         Hint hint = Hint::fromGuess(target, guess);
@@ -846,6 +847,7 @@ public: // private:
     word_t guess = nonWord();
     // map hint -> next GuessNode
     std::map<word_t, GuessNode> mpHintGuess;
+    static size_t numNodes;
 
 public:
     explicit GuessNode(const word_t& guessIn) : guess(guessIn) { }
@@ -860,7 +862,9 @@ public:
     {
         GuessNode node(guess);
         auto [it, f] = mpHintGuess.insert({ hint, node });
-        if (!f) {
+        if (f) {
+            ++numNodes;
+        } else {
             // Check if trying to set a different guess value - that's an error!
             if (node.guess != it->second.guess) {
                 throwError("GuessNode::addChild: different guesses for the same hint");
@@ -899,34 +903,101 @@ public:
     }
 };
 
+size_t GuessNode::numNodes = 1; // start at 1 to count the tree root node
+
 // Root node maps empty hint to the default first guess.
 static GuessNode guessRoot = GuessNode(nonWord());
 
 static void addSolutionToTree(const word_t& target)
 {
-    // TODO: see doSolveAll
+    GuessNode* guessCur = &guessRoot;
+    Hint hintCur = Hint("xxxxx"sv, "....."sv);
+    solution_t s = solveWord(target, allTargets, allGuesses,
+        [&target, &guessCur, &hintCur](const solution_t& sol) {
+            lprintln("Hint: {}", std::string_view(hintCur.getHint()));
+            guessCur = &guessCur->addChild(hintCur.getHint(), sol.first);
+            Hint hintNext = Hint::fromGuess(target, sol.first);
+            lprintln("Guess: {}", std::string_view(sol.first));
+            lprintln("Next hint: {}", std::string_view(hintNext.getHint()));
+            hintCur = hintNext;
+        });
+}
+
+static solution_t solveWordFast(const word_t& target, auto guessCallback)
+{
+    const GuessNode* guessCur = &guessRoot;
+    Hint hintCur = Hint("xxxxx"sv, "....."sv);
+    unsigned numGuesses = 0;
+    for (;;) {
+        //lprintln("Hint: {}", std::string_view(hintCur.getHint()));
+        guessCur = guessCur->findChild(hintCur.getHint());
+        if (!guessCur) {
+            throwError("No matching words found.");
+        }
+        solution_t solution = { guessCur->guess, ++numGuesses };
+        // Call a callback function for each guess.
+        guessCallback(solution);
+        if (guessCur->guess == target) {
+            // Return the answer and the number of guesses.
+            return solution;
+        }
+        hintCur = Hint::fromGuess(target, guessCur->guess);
+    }
+}
+
+// Show the solution for the target word given on the command line.
+static void doSolveFast(auto args)
+{
+    // Play games automatically with given target words.
+    for (auto&& arg : args) {
+        word_t target;
+        checkWord(arg);
+        copyWordFrom(target, arg);
+        lvprintln("Target: \"{}\"", std::string_view(target));
+        solution_t s = solveWordFast(target,
+                [](const solution_t& sol) {
+                    lvprint("Guess #{} is ", sol.second);
+                    lprintln("\"{}\"", std::string_view(sol.first));
+                });
+        lvprint("Answer: \"{}\" in ", std::string_view(s.first));
+        lprintln("{} tries", s.second);
+    }
 }
 
 // Test 5: TODO Explore the gamespace.
 static void test5(auto args)
 {
 #if true
+
+    for (auto&& arg : args) {
+        word_t target;
+        checkWord(arg);
+        copyWordFrom(target, arg);
+        addSolutionToTree(target);
+    }
+    lprintln("Tree has {} nodes", GuessNode::numNodes);
+
+    doSolveFast(args);
+#endif
+
+#if false
     GuessNode& firstGuess = guessRoot.addChild("....."sv, "raise"sv);
     firstGuess.addChild("....y"sv, "holey"sv);
     firstGuess.addChild("g...."sv, "boody"sv);
     firstGuess.addChild("g...."sv, "boody"sv); // duplicate insert succeeds
     //firstGuess.addChild("g...."sv, "boddy"sv); // insert with different guess fails
+    lprintln("Tree has {} nodes", GuessNode::numNodes);
 
-    const GuessNode* start = guessRoot.findChild("....."sv);
-    if (start == nullptr) {
+    const GuessNode* guessCur = &guessRoot;
+    guessCur = guessCur->findChild("....."sv);
+    if (guessCur == nullptr) {
         throwError("GuessNode::findChild: start node not found");
     }
- 
     std::string_view testHint = "....y"sv; // "g...."sv; // "..g.y"sv; // 
     std::print("{} -> ", testHint);
-    const GuessNode* guessFound = start->findChild(testHint);
-    if (guessFound) {
-        std::println("{}", std::string_view(guessFound->guess));
+    guessCur = guessCur->findChild(testHint);
+    if (guessCur) {
+        std::println("{}", std::string_view(guessCur->guess));
     } else {
         std::println("ERROR: Not found");
     }
