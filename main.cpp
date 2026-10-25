@@ -457,7 +457,7 @@ static word_t getNextGuess(const std::ranges::range auto& targets,
 static solution_t solveWord(const word_t& target,
     const std::ranges::range auto& targetWords,
     const std::ranges::range auto& guessWords,
-    bool fPrintGuesses)
+    auto guessCallback)
 {
     // Keep the lists of currently plausible target and guess words in a std::vector.
     wordList_t targets{ std::from_range, targetWords };
@@ -478,14 +478,13 @@ static solution_t solveWord(const word_t& target,
         } else {
             guess = getNextGuess(targets, guesses);
         }
-        if (fPrintGuesses) {
-            lvprint("Guess #{} is ", i + 1);
-            lprintln("\"{}\"", std::string_view(guess));
-        }
+        solution_t solution = { guess, i + 1 };
+        // Call a callback function for each guess.
+        guessCallback(solution);
         // Is this the correct answer?
         if (std::string_view(guess) == std::string_view(target)) {
             // Return the answer and the number of guesses.
-            return { guess, i + 1 };
+            return solution; // TODO { guess, i + 1 };
         }
         // Filter the targets list according to the latest guess.
         Hint hint = Hint::fromGuess(target, guess);
@@ -604,7 +603,11 @@ static void doSolve(auto args)
         lvprintln("Target: \"{}\"", std::string_view(target));
         solution_t s;
         double t = runTime([&]() {
-            s = solveWord(target, allTargets, allGuesses, true);
+            s = solveWord(target, allTargets, allGuesses,
+                [](const solution_t& sol) {
+                    lvprint("Guess #{} is ", sol.second);
+                    lprintln("\"{}\"", std::string_view(sol.first));
+                });
             });
         lvprintln("Time: {:.02f} seconds", t);
         lvprint("Answer: \"{}\" in ", std::string_view(s.first));
@@ -617,7 +620,8 @@ static void doSolve(auto args)
 static void doSolveAll(auto args)
 {
     for (auto&& target : allTargets) {
-        solution_t s = solveWord(target, allTargets, allGuesses, false);
+        solution_t s = solveWord(target, allTargets, allGuesses,
+            [](const solution_t& sol){});
         std::println("{}, {}", std::string_view(s.first), s.second);
         std::cout.flush();
     }
@@ -857,7 +861,10 @@ public:
         Guess node(guess);
         auto [it, f] = mpHintGuess.insert({ hint, node });
         if (!f) {
-            throwError("Guess::addChild: insert() failed");
+            // Check if trying to set a different guess value - that's an error!
+            if (node.guess != it->second.guess) {
+                throwError("Guess::addChild: different guesses for the same hint");
+            }
         }
         return it->second;
     }
@@ -897,7 +904,7 @@ static Guess guessRoot = Guess(nonWord());
 
 static void addSolutionToTree(const word_t& target)
 {
-
+    // TODO: see doSolveAll
 }
 
 // Test 5: TODO Explore the gamespace.
@@ -907,6 +914,8 @@ static void test5(auto args)
     Guess& firstGuess = guessRoot.addChild("....."sv, "raise"sv);
     firstGuess.addChild("....y"sv, "holey"sv);
     firstGuess.addChild("g...."sv, "boody"sv);
+    firstGuess.addChild("g...."sv, "boody"sv); // duplicate insert succeeds
+    //firstGuess.addChild("g...."sv, "boddy"sv); // insert with different guess fails
 
     const Guess* start = guessRoot.findChild("....."sv);
     if (start == nullptr) {
