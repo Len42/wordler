@@ -840,36 +840,36 @@ static word_t hintFromIndex(unsigned n)
     return hint;
 }
 
-class Guess
+class GuessNode
 {
 public: // private:
     word_t guess = nonWord();
-    // map hint -> next Guess
-    std::map<word_t, Guess> mpHintGuess;
+    // map hint -> next GuessNode
+    std::map<word_t, GuessNode> mpHintGuess;
 
 public:
-    explicit Guess(const word_t& guessIn) : guess(guessIn) { }
+    explicit GuessNode(const word_t& guessIn) : guess(guessIn) { }
 
-    explicit Guess(std::string_view guessIn)
+    explicit GuessNode(std::string_view guessIn)
     {
         checkWord(guessIn);
         copyWordFrom(guess, guessIn);
     }
 
-    Guess& addChild(const word_t& hint, const word_t& guess)
+    GuessNode& addChild(const word_t& hint, const word_t& guess)
     {
-        Guess node(guess);
+        GuessNode node(guess);
         auto [it, f] = mpHintGuess.insert({ hint, node });
         if (!f) {
             // Check if trying to set a different guess value - that's an error!
             if (node.guess != it->second.guess) {
-                throwError("Guess::addChild: different guesses for the same hint");
+                throwError("GuessNode::addChild: different guesses for the same hint");
             }
         }
         return it->second;
     }
 
-    Guess& addChild(std::string_view hintS, std::string_view guessS)
+    GuessNode& addChild(std::string_view hintS, std::string_view guessS)
     {
         word_t hint;
         copyWordFrom(hint, hintS);
@@ -881,7 +881,7 @@ public:
     }
 
     // TODO: is it OK to return a const?
-    const Guess* findChild(const word_t& hint) const
+    const GuessNode* findChild(const word_t& hint) const
     {
         auto it = mpHintGuess.find(hint);
         if (it == mpHintGuess.end()) {
@@ -890,7 +890,7 @@ public:
         return &it->second;
     }
 
-    const Guess* findChild(std::string_view hintS) const
+    const GuessNode* findChild(std::string_view hintS) const
     {
         word_t hint;
         copyWordFrom(hint, hintS);
@@ -900,7 +900,7 @@ public:
 };
 
 // Root node maps empty hint to the default first guess.
-static Guess guessRoot = Guess(nonWord());
+static GuessNode guessRoot = GuessNode(nonWord());
 
 static void addSolutionToTree(const word_t& target)
 {
@@ -911,20 +911,20 @@ static void addSolutionToTree(const word_t& target)
 static void test5(auto args)
 {
 #if true
-    Guess& firstGuess = guessRoot.addChild("....."sv, "raise"sv);
+    GuessNode& firstGuess = guessRoot.addChild("....."sv, "raise"sv);
     firstGuess.addChild("....y"sv, "holey"sv);
     firstGuess.addChild("g...."sv, "boody"sv);
     firstGuess.addChild("g...."sv, "boody"sv); // duplicate insert succeeds
     //firstGuess.addChild("g...."sv, "boddy"sv); // insert with different guess fails
 
-    const Guess* start = guessRoot.findChild("....."sv);
+    const GuessNode* start = guessRoot.findChild("....."sv);
     if (start == nullptr) {
-        throwError("Guess::findChild: start node not found");
+        throwError("GuessNode::findChild: start node not found");
     }
  
     std::string_view testHint = "....y"sv; // "g...."sv; // "..g.y"sv; // 
     std::print("{} -> ", testHint);
-    const Guess* guessFound = start->findChild(testHint);
+    const GuessNode* guessFound = start->findChild(testHint);
     if (guessFound) {
         std::println("{}", std::string_view(guessFound->guess));
     } else {
