@@ -914,13 +914,21 @@ static void addSolutionToTree(const word_t& target)
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
     solution_t s = solveWord(target, allTargets, allGuesses,
         [&target, &guessCur, &hintCur](const solution_t& sol) {
-            lprintln("Hint: {}", std::string_view(hintCur.getHint()));
+            //lprintln("Hint: {}", std::string_view(hintCur.getHint()));
             guessCur = &guessCur->addChild(hintCur.getHint(), sol.first);
             Hint hintNext = Hint::fromGuess(target, sol.first);
-            lprintln("Guess: {}", std::string_view(sol.first));
-            lprintln("Next hint: {}", std::string_view(hintNext.getHint()));
+            //lprintln("Guess: {}", std::string_view(sol.first));
+            //lprintln("Next hint: {}", std::string_view(hintNext.getHint()));
             hintCur = hintNext;
         });
+}
+
+static void addAllToTree(const std::ranges::range auto& targets)
+{
+    for (auto&& target : targets) {
+        lprintln("Adding {}", std::string_view(target));
+        addSolutionToTree(target);
+    }
 }
 
 static solution_t solveWordFast(const word_t& target, auto guessCallback)
@@ -945,14 +953,21 @@ static solution_t solveWordFast(const word_t& target, auto guessCallback)
     }
 }
 
-// Show the solution for the target word given on the command line.
-static void doSolveFast(auto args)
+static std::ranges::view auto convertArgs(const std::ranges::range auto& args)
 {
-    // Play games automatically with given target words.
-    for (auto&& arg : args) {
-        word_t target;
-        checkWord(arg);
-        copyWordFrom(target, arg);
+    return args
+        | std::views::transform([](auto&& arg) {
+                word_t word;
+                checkWord(arg);
+                copyWordFrom(word, arg);
+                return word;
+            });
+}
+
+// Show the solution for the target word given on the command line.
+static void doSolveFast(const std::ranges::range auto& targets)
+{
+    for (auto&& target : targets) {
         lvprintln("Target: \"{}\"", std::string_view(target));
         solution_t s = solveWordFast(target,
                 [](const solution_t& sol) {
@@ -967,80 +982,16 @@ static void doSolveFast(auto args)
 // Test 5: TODO Explore the gamespace.
 static void test5(auto args)
 {
-#if true
-
-    for (auto&& arg : args) {
-        word_t target;
-        checkWord(arg);
-        copyWordFrom(target, arg);
-        addSolutionToTree(target);
-    }
+    auto targets =
+#if false
+        allTargets | std::views::take(15);
+#else
+        convertArgs(args);
+#endif
+    addAllToTree(targets);
     lprintln("Tree has {} nodes", GuessNode::numNodes);
 
-    doSolveFast(args);
-#endif
-
-#if false
-    GuessNode& firstGuess = guessRoot.addChild("....."sv, "raise"sv);
-    firstGuess.addChild("....y"sv, "holey"sv);
-    firstGuess.addChild("g...."sv, "boody"sv);
-    firstGuess.addChild("g...."sv, "boody"sv); // duplicate insert succeeds
-    //firstGuess.addChild("g...."sv, "boddy"sv); // insert with different guess fails
-    lprintln("Tree has {} nodes", GuessNode::numNodes);
-
-    const GuessNode* guessCur = &guessRoot;
-    guessCur = guessCur->findChild("....."sv);
-    if (guessCur == nullptr) {
-        throwError("GuessNode::findChild: start node not found");
-    }
-    std::string_view testHint = "....y"sv; // "g...."sv; // "..g.y"sv; // 
-    std::print("{} -> ", testHint);
-    guessCur = guessCur->findChild(testHint);
-    if (guessCur) {
-        std::println("{}", std::string_view(guessCur->guess));
-    } else {
-        std::println("ERROR: Not found");
-    }
-#endif
-
-#if false
-    word_t guess = getFirstGuess();
-    size_t cAnyMatches = 0;
-    for (const word_t& wHint : getAllHints()) {
-        Hint hint(guess, wHint);
-        auto matches = filterTargets(hint, allTargets);
-        size_t cMatches = matches.size();
-        unsigned i = indexFromHint(wHint);
-        auto wHint2 = hintFromIndex(i);
-        if (wHint != wHint2) {
-            std::println("{} {}", std::string_view(wHint), std::string_view(wHint2));
-            throwError("oops");
-        }
-        /*if (cMatches != 0)*/ {
-            ++cAnyMatches;
-            std::println("{} {} {}",
-                std::string_view(wHint), i, std::string_view(wHint2), cMatches);
-        }
-    }
-    std::println("{} of {} hints have some matching targets", cAnyMatches, getAllHints().size());
-#endif
-
-#if false
-    static constexpr word_t nonTargetGuesses[] = {
-    #include "words-guess.h"
-    };
-    //word_t guess = getFirstGuess();
-    //word_t wHint { '.','.','.','.','g' };
-    //Hint hint { guess, wHint};
-    //auto hints = std::views::single(hint);
-    std::string_view aHints[] = { "raise", "...gg", "pulse", "..ygg" };
-    lvprintln("hints: {}", aHints);
-    auto hints = makeHints(aHints);
-    auto matches1 = filterTargets(hints, allTargets);
-    lprintln("Targets: {}", matches1.size());
-    auto matches2 = filterTargets(hints, nonTargetGuesses);
-    lprintln("Others: {}", matches2.size());
-#endif
+    doSolveFast(targets);
 }
 
 #endif // TEST5
