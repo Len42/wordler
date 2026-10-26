@@ -845,23 +845,33 @@ class GuessNode
 {
 public: // private:
     word_t guess = nonWord();
-    // map hint -> next GuessNode
-    std::map<word_t, GuessNode> mpHintGuess;
+    std::map<word_t, GuessNode> children; // map hint -> next GuessNode
     static size_t numNodes;
 
 public:
     explicit GuessNode(const word_t& guessIn) : guess(guessIn) { }
 
+    explicit GuessNode(const word_t& guessIn, 
+        const std::map<word_t, GuessNode>& childrenIn)
+        : guess(guessIn), children(childrenIn)
+    {
+        ++numNodes;
+    }
+
+#if 0 // REMOVE?
     explicit GuessNode(std::string_view guessIn)
     {
         checkWord(guessIn);
         copyWordFrom(guess, guessIn);
     }
+#endif
+
+    // TODO: NEEDED? bool isLeaf() const { return children.empty(); }
 
     GuessNode& addChild(const word_t& hint, const word_t& guess)
     {
         GuessNode node(guess);
-        auto [it, f] = mpHintGuess.insert({ hint, node });
+        auto [it, f] = children.insert({ hint, node });
         if (f) {
             ++numNodes;
         } else {
@@ -887,8 +897,8 @@ public:
     // TODO: is it OK to return a const?
     const GuessNode* findChild(const word_t& hint) const
     {
-        auto it = mpHintGuess.find(hint);
-        if (it == mpHintGuess.end()) {
+        auto it = children.find(hint);
+        if (it == children.end()) {
             return nullptr;
         }
         return &it->second;
@@ -906,7 +916,11 @@ public:
 size_t GuessNode::numNodes = 1; // start at 1 to count the tree root node
 
 // Root node maps empty hint to the default first guess.
+#if 0
 static GuessNode guessRoot = GuessNode(nonWord());
+#else
+#include "treeData.h"
+#endif
 
 static void addSolutionToTree(const word_t& target)
 {
@@ -931,13 +945,42 @@ static void addAllToTree(const std::ranges::range auto& targets)
     }
 }
 
+static void writeWord(const word_t& word)
+{
+    std::print("{{'{}','{}','{}','{}','{}'}}",
+        word[0], word[1], word[2], word[3], word[4]);
+}
+
+static void writeGuessNode(const GuessNode& node, unsigned depth)
+{
+    std::string spaces(2*depth, ' ');
+    std::print("GuessNode{{ ");
+    writeWord(node.guess);
+    std::println(", {{");
+    for (auto&& child : node.children) {
+        std::print("{}  {{ ", spaces);
+        writeWord(child.first);
+        std::print(", ");
+        writeGuessNode(child.second, depth+1);
+        std::print("{} }}, ", spaces);
+    }
+    //std::println("{}}} }}", spaces);
+    std::println("}} }}");
+}
+
+static void writeTree()
+{
+    std::println("static GuessNode guessRoot =");
+    writeGuessNode(guessRoot, 0);
+    std::println(";");
+}
+
 static solution_t solveWordFast(const word_t& target, auto guessCallback)
 {
     const GuessNode* guessCur = &guessRoot;
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
     unsigned numGuesses = 0;
     for (;;) {
-        //lprintln("Hint: {}", std::string_view(hintCur.getHint()));
         guessCur = guessCur->findChild(hintCur.getHint());
         if (!guessCur) {
             throwError("No matching words found.");
@@ -983,15 +1026,18 @@ static void doSolveFast(const std::ranges::range auto& targets)
 static void test5(auto args)
 {
     auto targets =
-#if false
-        allTargets | std::views::take(15);
+#if true
+        allTargets | std::views::take(2);
 #else
         convertArgs(args);
 #endif
-    addAllToTree(targets);
-    lprintln("Tree has {} nodes", GuessNode::numNodes);
 
-    doSolveFast(targets);
+    addAllToTree(targets);
+    //lprintln("Tree has {} nodes", GuessNode::numNodes);
+
+    //doSolveFast(targets);
+
+    writeTree();
 }
 
 #endif // TEST5
