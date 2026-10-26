@@ -916,7 +916,7 @@ public:
 size_t GuessNode::numNodes = 1; // start at 1 to count the tree root node
 
 // Root node maps empty hint to the default first guess.
-#if 0
+#if 1
 static GuessNode guessRoot = GuessNode(nonWord());
 #else
 #include "treeData.h"
@@ -941,6 +941,7 @@ static void addAllToTree(const std::ranges::range auto& targets)
 {
     for (auto&& target : targets) {
         lprintln("Adding {}", std::string_view(target));
+        std::cout.flush();
         addSolutionToTree(target);
     }
 }
@@ -1027,13 +1028,15 @@ static void test5(auto args)
 {
     auto targets =
 #if true
-        allTargets | std::views::take(2);
+        std::views::all(allTargets);
+#elif false
+        allTargets | std::views::take(10);
 #else
         convertArgs(args);
 #endif
 
     addAllToTree(targets);
-    //lprintln("Tree has {} nodes", GuessNode::numNodes);
+    lprintln("Tree has {} nodes", GuessNode::numNodes);
 
     //doSolveFast(targets);
 
