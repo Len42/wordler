@@ -867,25 +867,6 @@ public: // private:
 public:
     explicit GuessNode(const word_t& guessIn) : guess(guessIn) { }
 
-#if 0 // REMOVE?
-    explicit GuessNode(const word_t& guessIn,
-        const std::map<word_t, GuessNode>& childrenIn)
-        : guess(guessIn), children(childrenIn)
-    {
-        ++numNodes;
-    }
-#endif
-
-#if 0 // REMOVE?
-    explicit GuessNode(std::string_view guessIn)
-    {
-        checkWord(guessIn);
-        copyWordFrom(guess, guessIn);
-    }
-#endif
-
-    // TODO: NEEDED? bool isLeaf() const { return children.empty(); }
-
     GuessNode& addChild(const word_t& hint, const GuessNode& child)
     {
         auto [it, f] = children.insert({ hint, child });
@@ -905,7 +886,6 @@ public:
         return addChild(hint, GuessNode(guess));
     }
 
-    // TODO: is it OK to return a const?
     const GuessNode* findChild(const word_t& hint) const
     {
         auto it = children.find(hint);
@@ -949,35 +929,6 @@ static void addAllToTree(const std::ranges::range auto& targets)
     }
 }
 
-#if 0
-static void writeWord(const word_t& word)
-{
-    std::print("{{'{}','{}','{}','{}','{}'}}",
-        word[0], word[1], word[2], word[3], word[4]);
-}
-
-static void writeGuessNode(const GuessNode& node, unsigned depth)
-{
-    std::string spaces(2*depth, ' ');
-    std::print("GuessNode{{ ");
-    writeWord(node.guess);
-    std::println(", {{");
-    for (auto&& child : node.children) {
-        std::print("{}  {{ ", spaces);
-        writeWord(child.first);
-        std::print(", ");
-        writeGuessNode(child.second, depth+1);
-        std::print("{} }}, ", spaces);
-    }
-    //std::println("{}}} }}", spaces);
-    std::println("}} }}");
-}
-#else
-//static void writeWord(const word_t& word)
-//{
-//    std::print("\"{}\"", std::string_view(word));
-//}
-
 static void writeGuessNode(const GuessNode& node, unsigned depth)
 {
     std::print("\"{}\" {}", std::string_view(node.guess), node.children.size());
@@ -988,7 +939,6 @@ static void writeGuessNode(const GuessNode& node, unsigned depth)
         writeGuessNode(child.second, depth);
     }
 }
-#endif
 
 static void writeTree(/*TODO: pass guessRoot as a param*/)
 {
@@ -1037,6 +987,8 @@ static GuessNode readNode(std::istream& input, std::string& sBuf)
     return node;
 }
 
+// Return the name of the solution data file, which depends on whether normal or
+// hard mode is selected.
 static std::string_view dataFileName()
 {
     return CommandLine::GetHardMode() ? "dataHard.txt"sv : "dataNormal.txt"sv;
@@ -1045,7 +997,6 @@ static std::string_view dataFileName()
 // Load a GuessNode tree from a data file (the output of TODO).
 // Use stdin if filename is empty.
 static GuessNode loadTreeDataFile(std::string_view filename)
-/*TODO: pass guessRoot as a param*/
 {
     // Either open a file or use stdin.
     std::ifstream inFile;
@@ -1102,7 +1053,8 @@ static void test5(auto args)
 #if true
     addAllToTree(targets);
     lvprintln("Tree has {} nodes", GuessNode::numNodes);
-    writeTree();
+    writeGuessNode(guessRoot, 0);
+    std::println();
 #else
     guessRoot = loadTreeDataFile(dataFileName());
     lvprintln("Tree has {} nodes", GuessNode::numNodes);
