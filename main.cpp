@@ -959,12 +959,9 @@ private:
 
 size_t GuessNode::numNodes = 1; // start at 1 to count the tree root node
 
-// Root node maps empty hint to the default first guess.
-static GuessNode guessRoot = GuessNode(nonWord());
-
-static void addSolutionToTree(const word_t& target)
+static void addSolutionToTree(const word_t& target, GuessNode& root)
 {
-    GuessNode* guessCur = &guessRoot;
+    GuessNode* guessCur = &root;
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
     guess_t solution = solveWord(target, allTargets, allGuesses,
         [&target, &guessCur, &hintCur](const guess_t& g) {
@@ -975,11 +972,11 @@ static void addSolutionToTree(const word_t& target)
 
 // Build a solution data tree covering the given target word_t's.
 // --hard controls whether normal or hard mode solutions are generated.
-static void addAllToTree(const std::ranges::range auto& targets)
+static void addAllToTree(const std::ranges::range auto& targets, GuessNode& root)
 {
-    for (auto&& target : targets) {
+    for (auto&& target : targets /*DEBUG*/ | std::views::take(3)) {
         std::cout.flush();
-        addSolutionToTree(target);
+        addSolutionToTree(target, root);
     }
 }
 
@@ -987,8 +984,9 @@ static void addAllToTree(const std::ranges::range auto& targets)
 // --hard controls whether normal or hard mode solutions are generated.
 static void doBuildTree(auto args)
 {
-    addAllToTree(allTargets);
-    guessRoot.write(0);
+    GuessNode root = GuessNode(nonWord());
+    addAllToTree(allTargets, root);
+    root.write(0);
     std::println();
 }
 
@@ -1022,9 +1020,10 @@ static void test5(auto args)
     //doSolveFast(targets);
 }
 
-static guess_t solveWordFast(const word_t& target, auto guessCallback)
+static guess_t solveWordFast(const word_t& target, const GuessNode& root,
+    auto guessCallback)
 {
-    const GuessNode* guessCur = &guessRoot;
+    const GuessNode* guessCur = &root;
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
     unsigned numGuesses = 0;
     for (;;) {
@@ -1044,11 +1043,12 @@ static guess_t solveWordFast(const word_t& target, auto guessCallback)
 }
 
 // Show the solution for the target word given on the command line.
-static void doSolveFast(const std::ranges::range auto& targets)
+static void doSolveFast(auto args)
 {
-    for (auto&& target : targets) {
+    GuessNode root = loadSolutionDataFile(dataFileName());
+    for (auto&& target : convertArgsToWords(args)) {
         lvprintln("Target: \"{}\"", std::string_view(target));
-        guess_t solution = solveWordFast(target, printGuessCallback);
+        guess_t solution = solveWordFast(target, root, printGuessCallback);
         lvprint("Answer: \"{}\" in ", std::string_view(solution.first));
         lprintln("{} tries", solution.second);
     }
@@ -1057,10 +1057,8 @@ static void doSolveFast(const std::ranges::range auto& targets)
 // Test 6: Fast solutions!!!
 static void test6(auto args)
 {
-    auto targets = convertArgsToWords(args);
-    guessRoot = loadSolutionDataFile(dataFileName());
     lvprintln("Tree has {} nodes", GuessNode::numNodes);
-    doSolveFast(targets);
+    doSolveFast(args);
 }
 
 #endif // TEST5
