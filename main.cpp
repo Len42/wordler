@@ -70,8 +70,8 @@ using wordList_t = std::vector<word_t>;
 // Number of guesses allowed
 static constexpr unsigned maxGuesses = 6;
 
-// solution_t is an answer word and the number of guesses that it took to solve
-using solution_t = std::pair<word_t, unsigned>;
+// guess_t is an answer guess and the number of guesses made so far
+using guess_t = std::pair<word_t, unsigned>;
 
 // Throw an exception with a message.
 [[noreturn]] static void throwError(const char* message)
@@ -335,10 +335,23 @@ public:
     }
 };
 
+// Make a list of word_t's from the given command line arguments.
+// Returns an unevaluated view.
+static std::ranges::view auto convertArgsToWords(const std::ranges::range auto& args)
+{
+    return args
+        | std::views::transform([](auto&& arg) {
+        word_t word;
+        checkWord(arg);
+        copyWordFrom(word, arg);
+        return word;
+            });
+}
+
 // Make a list of Hints from the given command line arguments.
 // Each consecutive pair of args is a guess-hint pair for a Hint.
 // Returns an unevaluated view.
-static std::ranges::view auto makeHints(const std::ranges::range auto& args)
+static std::ranges::view auto convertArgsToHints(const std::ranges::range auto& args)
 {
     return args | std::views::chunk(2)
         | std::views::transform([](auto&& pattern) {
@@ -454,7 +467,7 @@ static word_t getNextGuess(const std::ranges::range auto& targets,
 }
 
 // Solve for a given target word by calling getNextGuess() repeatedly.
-static solution_t solveWord(const word_t& target,
+static guess_t solveWord(const word_t& target,
     const std::ranges::range auto& targetWords,
     const std::ranges::range auto& guessWords,
     auto guessCallback)
@@ -478,14 +491,14 @@ static solution_t solveWord(const word_t& target,
         } else {
             guess = getNextGuess(targets, guesses);
         }
-        solution_t solution = { guess, i + 1 };
+        guess_t curGuess = { guess, i + 1 };
         // Call a callback function for each guess.
-        guessCallback(solution);
+        guessCallback(curGuess);
         // Is this the correct answer?
         //if (std::string_view(guess) == std::string_view(target)) {
         if (guess == target) {
             // Return the answer and the number of guesses.
-            return solution;
+            return curGuess;
         }
         // Filter the targets list according to the latest guess.
         Hint hint = Hint::fromGuess(target, guess);
@@ -519,7 +532,7 @@ static void doNextGuess(auto args)
         word_t guess = nonWord();
         // Find a good next guess. Show how long it takes.
         double t = runTime([&]() {
-            auto hints = makeHints(args);
+            auto hints = convertArgsToHints(args);
             wordList_t targets = filterTargets(hints, allTargets);
             // In "hard mode" the list of guess words must be filtered by the
             // hints seen so far. This is a bit inefficient when _not_ in hard
@@ -597,22 +610,20 @@ static void doPlayGame(auto args)
 static void doSolve(auto args)
 {
     // Play games automatically with given target words.
-    for (auto&& arg : args) {
-        word_t target;
-        checkWord(arg);
-        copyWordFrom(target, arg);
+    auto targets = convertArgsToWords(args);
+    for (auto&& target : targets) {
         lvprintln("Target: \"{}\"", std::string_view(target));
-        solution_t s;
+        guess_t solution;
         double t = runTime([&]() {
-            s = solveWord(target, allTargets, allGuesses,
-                [](const solution_t& sol) {
-                    lvprint("Guess #{} is ", sol.second);
-                    lprintln("\"{}\"", std::string_view(sol.first));
+            solution = solveWord(target, allTargets, allGuesses,
+                [](const guess_t& gg) {
+                    lvprint("Guess #{} is ", gg.second);
+                    lprintln("\"{}\"", std::string_view(gg.first));
                 });
             });
         lvprintln("Time: {:.02f} seconds", t);
-        lvprint("Answer: \"{}\" in ", std::string_view(s.first));
-        lprintln("{} tries", s.second);
+        lvprint("Answer: \"{}\" in ", std::string_view(solution.first));
+        lprintln("{} tries", solution.second);
     }
 }
 
@@ -621,9 +632,9 @@ static void doSolve(auto args)
 static void doSolveAll(auto args)
 {
     for (auto&& target : allTargets) {
-        solution_t s = solveWord(target, allTargets, allGuesses,
-            [](const solution_t& sol){});
-        std::println("{}, {}", std::string_view(s.first), s.second);
+        guess_t solution = solveWord(target, allTargets, allGuesses,
+            [](const guess_t&){});
+        std::println("{}, {}", std::string_view(solution.first), solution.second);
         std::cout.flush();
     }
 }
@@ -649,15 +660,15 @@ static std::istream& openInputFile(std::ifstream& file, std::string_view filenam
     }
 }
 
-// Load a list of solution_t from a results file (the output of --all).
+// Load a list of guess_t from a results file (the output of --all).
 // Use stdin if filename is empty.
-static std::vector<solution_t> loadResultsFile(std::string_view filename)
+static std::vector<guess_t> loadResultsFile(std::string_view filename)
 {
     // Either open a file or use stdin.
     std::ifstream inFile;
     std::istream& input = openInputFile(inFile, filename);
     // Read and parse the file.
-    std::vector<solution_t> results;
+    std::vector<guess_t> results;
     std::string lineStr;
     while (std::getline(input, lineStr)) {
         // Each line has a guess word and a number, e.g. "atlas, 3"
@@ -673,7 +684,7 @@ static std::vector<solution_t> loadResultsFile(std::string_view filename)
         unsigned num = numFromStr(line);
         word_t wtemp;
         copyWordFrom(wtemp, word);
-        results.push_back(solution_t{ wtemp, num });
+        results.push_back(guess_t{ wtemp, num });
     }
     return results;
 }
@@ -683,8 +694,8 @@ struct Stats
 {
     unsigned long count = 0;
     unsigned long totalGuesses = 0;
-    solution_t min = { nonWord(), 99};
-    solution_t max = { nonWord(), 0};
+    guess_t min = { nonWord(), 99};
+    guess_t max = { nonWord(), 0};
 };
 
 // Display statistics for the results produced by --all.
@@ -700,7 +711,7 @@ static void doShowStats(auto args)
     std::println("Number of results: {}", results.size());
     // Use std::accumulate to calculate statistics.
     Stats stats = std::accumulate(results.begin(), results.end(), Stats{},
-        [](const Stats& accum, const solution_t next) -> Stats {
+        [](const Stats& accum, const guess_t next) -> Stats {
             return Stats{
                 .count = accum.count + 1,
                 .totalGuesses = accum.totalGuesses + next.second,
@@ -754,7 +765,7 @@ static void test2(auto args)
     if ((args.size() % 2) == 1) {
         throwError("Requires an even number of args");
     }
-    auto hints = makeHints(args);
+    auto hints = convertArgsToHints(args);
     auto matches =
         allTargets
         | std::views::filter([&hints](auto&& word) {
@@ -777,13 +788,11 @@ static void test3(auto args)
         throwError("Requires 2+ args");
     }
     lvprintln("Target: {}", args[0]);
-    word_t target;
-    checkWord(args[0]);
-    copyWordFrom(target, args[0]);
-    for (auto&& guessS : args | std::views::drop(1)) {
-        word_t guess;
-        checkWord(guessS);
-        copyWordFrom(guess, guessS);
+    auto words = convertArgsToWords(args);
+    auto it = words.begin();
+    word_t target = *(it++);
+    while (it != words.end()) {
+        word_t guess = *(it++);
         Hint hint = Hint::fromGuess(target, guess);
         hint.print();
     }
@@ -922,12 +931,12 @@ static void addSolutionToTree(const word_t& target)
 {
     GuessNode* guessCur = &guessRoot;
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
-    solution_t s = solveWord(target, allTargets, allGuesses,
-        [&target, &guessCur, &hintCur](const solution_t& sol) {
+    guess_t solution = solveWord(target, allTargets, allGuesses,
+        [&target, &guessCur, &hintCur](const guess_t& g) {
             //lprintln("Hint: {}", std::string_view(hintCur.getHint()));
-            guessCur = &guessCur->addChild(hintCur.getHint(), sol.first);
-            Hint hintNext = Hint::fromGuess(target, sol.first);
-            //lprintln("Guess: {}", std::string_view(sol.first));
+            guessCur = &guessCur->addChild(hintCur.getHint(), g.first);
+            Hint hintNext = Hint::fromGuess(target, g.first);
+            //lprintln("Guess: {}", std::string_view(g.first));
             //lprintln("Next hint: {}", std::string_view(hintNext.getHint()));
             hintCur = hintNext;
         });
@@ -1030,6 +1039,11 @@ static GuessNode readNode(std::istream& input, std::string& sBuf)
     return node;
 }
 
+static std::string_view dataFileName()
+{
+    return CommandLine::GetHardMode() ? "dataHard.txt"sv : "dataNormal.txt"sv;
+}
+
 // Load a GuessNode tree from a data file (the output of TODO).
 // Use stdin if filename is empty.
 static GuessNode loadTreeDataFile(std::string_view filename)
@@ -1043,7 +1057,7 @@ static GuessNode loadTreeDataFile(std::string_view filename)
     return readNode(input, sBuf);
 }
 
-static solution_t solveWordFast(const word_t& target, auto guessCallback)
+static guess_t solveWordFast(const word_t& target, auto guessCallback)
 {
     const GuessNode* guessCur = &guessRoot;
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
@@ -1053,26 +1067,15 @@ static solution_t solveWordFast(const word_t& target, auto guessCallback)
         if (!guessCur) {
             throwError("No matching words found.");
         }
-        solution_t solution = { guessCur->guess, ++numGuesses };
+        guess_t guess = { guessCur->guess, ++numGuesses };
         // Call a callback function for each guess.
-        guessCallback(solution);
+        guessCallback(guess);
         if (guessCur->guess == target) {
             // Return the answer and the number of guesses.
-            return solution;
+            return guess;
         }
         hintCur = Hint::fromGuess(target, guessCur->guess);
     }
-}
-
-static std::ranges::view auto convertArgs(const std::ranges::range auto& args)
-{
-    return args
-        | std::views::transform([](auto&& arg) {
-                word_t word;
-                checkWord(arg);
-                copyWordFrom(word, arg);
-                return word;
-            });
 }
 
 // Show the solution for the target word given on the command line.
@@ -1080,13 +1083,13 @@ static void doSolveFast(const std::ranges::range auto& targets)
 {
     for (auto&& target : targets) {
         lvprintln("Target: \"{}\"", std::string_view(target));
-        solution_t s = solveWordFast(target,
-                [](const solution_t& sol) {
-                    lvprint("Guess #{} is ", sol.second);
-                    lprintln("\"{}\"", std::string_view(sol.first));
+        guess_t solution = solveWordFast(target,
+                [](const guess_t& g) {
+                    lvprint("Guess #{} is ", g.second);
+                    lprintln("\"{}\"", std::string_view(g.first));
                 });
-        lvprint("Answer: \"{}\" in ", std::string_view(s.first));
-        lprintln("{} tries", s.second);
+        lvprint("Answer: \"{}\" in ", std::string_view(solution.first));
+        lprintln("{} tries", solution.second);
     }
 }
 
@@ -1094,19 +1097,23 @@ static void doSolveFast(const std::ranges::range auto& targets)
 static void test5(auto args)
 {
     auto targets =
-#if true
+#if false
         std::views::all(allTargets);
-#elif true
+#elif false
         allTargets | std::views::take(10);
 #else
-        convertArgs(args);
+        convertArgsToWords(args);
 #endif
 
+#if false
     addAllToTree(targets);
-    //guessRoot = loadTreeDataFile("dataHard.txt"sv);
     lvprintln("Tree has {} nodes", GuessNode::numNodes);
-    //doSolveFast(targets);
     writeTree();
+#else
+    guessRoot = loadTreeDataFile(dataFileName());
+    lvprintln("Tree has {} nodes", GuessNode::numNodes);
+    doSolveFast(targets);
+#endif
 }
 
 #endif // TEST5
