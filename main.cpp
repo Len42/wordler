@@ -606,6 +606,12 @@ static void doPlayGame(auto args)
         std::string_view(answer), maxGuesses);
 }
 
+static void printGuessCallback(const guess_t& g)
+{
+    lvprint("Guess #{} is ", g.second);
+    lprintln("\"{}\"", std::string_view(g.first));
+}
+
 // Show the solution for the target word given on the command line.
 static void doSolve(auto args)
 {
@@ -615,11 +621,7 @@ static void doSolve(auto args)
         lvprintln("Target: \"{}\"", std::string_view(target));
         guess_t solution;
         double t = runTime([&]() {
-            solution = solveWord(target, allTargets, allGuesses,
-                [](const guess_t& gg) {
-                    lvprint("Guess #{} is ", gg.second);
-                    lprintln("\"{}\"", std::string_view(gg.first));
-                });
+            solution = solveWord(target, allTargets, allGuesses, printGuessCallback);
             });
         lvprintln("Time: {:.02f} seconds", t);
         lvprint("Answer: \"{}\" in ", std::string_view(solution.first));
@@ -933,12 +935,8 @@ static void addSolutionToTree(const word_t& target)
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
     guess_t solution = solveWord(target, allTargets, allGuesses,
         [&target, &guessCur, &hintCur](const guess_t& g) {
-            //lprintln("Hint: {}", std::string_view(hintCur.getHint()));
             guessCur = &guessCur->addChild(hintCur.getHint(), g.first);
-            Hint hintNext = Hint::fromGuess(target, g.first);
-            //lprintln("Guess: {}", std::string_view(g.first));
-            //lprintln("Next hint: {}", std::string_view(hintNext.getHint()));
-            hintCur = hintNext;
+            hintCur = Hint::fromGuess(target, g.first);
         });
 }
 
@@ -1083,11 +1081,7 @@ static void doSolveFast(const std::ranges::range auto& targets)
 {
     for (auto&& target : targets) {
         lvprintln("Target: \"{}\"", std::string_view(target));
-        guess_t solution = solveWordFast(target,
-                [](const guess_t& g) {
-                    lvprint("Guess #{} is ", g.second);
-                    lprintln("\"{}\"", std::string_view(g.first));
-                });
+        guess_t solution = solveWordFast(target, printGuessCallback);
         lvprint("Answer: \"{}\" in ", std::string_view(solution.first));
         lprintln("{} tries", solution.second);
     }
@@ -1105,7 +1099,7 @@ static void test5(auto args)
         convertArgsToWords(args);
 #endif
 
-#if false
+#if true
     addAllToTree(targets);
     lvprintln("Tree has {} nodes", GuessNode::numNodes);
     writeTree();
