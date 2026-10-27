@@ -902,6 +902,58 @@ public:
         checkHint(hint);
         return findChild(hint);
     }
+
+    void write(unsigned depth) const
+    {
+        std::print("\"{}\" {}", std::string_view(guess), children.size());
+        ++depth;
+        std::string spaces(2 * depth, ' ');
+        for (auto&& child : children) {
+            std::print("\n{}\"{}\" ", spaces, std::string_view(child.first));
+            child.second.write(depth);
+        }
+    }
+
+    static GuessNode readNode(std::istream& input, std::string& sBuf)
+    {
+        word_t word = readNodeWord(input, sBuf);
+        size_t numChildren = readNodeNum(input, sBuf);
+        GuessNode node = GuessNode(word);
+        for (size_t i = 0; i < numChildren; ++i) {
+            word_t hint = readNodeWord(input, sBuf);
+            node.addChild(hint, readNode(input, sBuf)); // recursion oh noes
+        }
+        return node;
+    }
+
+private:
+    static word_t readNodeWord(std::istream& input, std::string& sBuf)
+    {
+        char ch;
+        do {
+            ch = input.get();
+        } while (ch != '"');
+        sBuf.clear();
+        for (ch = input.get(); ch != '"'; ch = input.get()) {
+            sBuf += ch;
+        }
+        word_t word;
+        copyWordFrom(word, sBuf);
+        return word;
+    }
+
+    static size_t readNodeNum(std::istream& input, std::string& sBuf)
+    {
+        char ch;
+        do {
+            ch = input.get();
+        } while (std::isspace(ch));
+        sBuf = ch;
+        for (ch = input.get(); std::isdigit(ch); ch = input.get()) {
+            sBuf += ch;
+        }
+        return numFromStr(sBuf);
+    }
 };
 
 size_t GuessNode::numNodes = 1; // start at 1 to count the tree root node
@@ -929,64 +981,6 @@ static void addAllToTree(const std::ranges::range auto& targets)
     }
 }
 
-static void writeGuessNode(const GuessNode& node, unsigned depth)
-{
-    std::print("\"{}\" {}", std::string_view(node.guess), node.children.size());
-    ++depth;
-    std::string spaces(2 * depth, ' ');
-    for (auto&& child : node.children) {
-        std::print("\n{}\"{}\" ", spaces, std::string_view(child.first));
-        writeGuessNode(child.second, depth);
-    }
-}
-
-static void writeTree(/*TODO: pass guessRoot as a param*/)
-{
-    //std::println("static GuessNode guessRoot =");
-    writeGuessNode(guessRoot, 0);
-    std::println(/*";"*/);
-}
-
-static word_t readNodeWord(std::istream& input, std::string& sBuf)
-{
-    char ch;
-    do {
-        ch = input.get();
-    } while (ch != '"');
-    sBuf.clear();
-    for (ch = input.get(); ch != '"'; ch = input.get()) {
-        sBuf += ch;
-    }
-    word_t word;
-    copyWordFrom(word, sBuf);
-    return word;
-}
-
-static size_t readNodeNum(std::istream& input, std::string& sBuf)
-{
-    char ch;
-    do {
-        ch = input.get();
-    } while (std::isspace(ch));
-    sBuf = ch;
-    for (ch = input.get(); std::isdigit(ch); ch = input.get()) {
-        sBuf += ch;
-    }
-    return numFromStr(sBuf);
-}
-
-static GuessNode readNode(std::istream& input, std::string& sBuf)
-{
-    word_t word = readNodeWord(input, sBuf);
-    size_t numChildren = readNodeNum(input, sBuf);
-    GuessNode node = GuessNode(word);
-    for (size_t i = 0; i < numChildren; ++i) {
-        word_t hint = readNodeWord(input, sBuf);
-        node.addChild(hint, readNode(input, sBuf)); // recursion oh noes
-    }
-    return node;
-}
-
 // Return the name of the solution data file, which depends on whether normal or
 // hard mode is selected.
 static std::string_view dataFileName()
@@ -996,14 +990,14 @@ static std::string_view dataFileName()
 
 // Load a GuessNode tree from a data file (the output of TODO).
 // Use stdin if filename is empty.
-static GuessNode loadTreeDataFile(std::string_view filename)
+static GuessNode loadSolutionDataFile(std::string_view filename)
 {
     // Either open a file or use stdin.
     std::ifstream inFile;
     std::istream& input = openInputFile(inFile, filename);
     // Read and parse the file.
     std::string sBuf;
-    return readNode(input, sBuf);
+    return GuessNode::readNode(input, sBuf);
 }
 
 static guess_t solveWordFast(const word_t& target, auto guessCallback)
@@ -1050,13 +1044,13 @@ static void test5(auto args)
         convertArgsToWords(args);
 #endif
 
-#if true
+#if false
     addAllToTree(targets);
     lvprintln("Tree has {} nodes", GuessNode::numNodes);
-    writeGuessNode(guessRoot, 0);
+    guessRoot.write(0);
     std::println();
 #else
-    guessRoot = loadTreeDataFile(dataFileName());
+    guessRoot = loadSolutionDataFile(dataFileName());
     lvprintln("Tree has {} nodes", GuessNode::numNodes);
     doSolveFast(targets);
 #endif
