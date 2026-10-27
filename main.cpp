@@ -994,7 +994,7 @@ static void doBuildTree(auto args)
 // hard mode is selected.
 static std::string_view dataFileName()
 {
-    return CommandLine::GetHardMode() ? "dataHard.txt"sv : "dataNormal.txt"sv;
+    return CommandLine::GetHardMode() ? "data-hard.txt"sv : "data-normal.txt"sv;
 }
 
 // Load a GuessNode tree from a data file (the output of --build).
