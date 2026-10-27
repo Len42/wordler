@@ -895,11 +895,13 @@ static word_t getNextGuessFast(const std::ranges::range auto& hints,
     // Fail out if the given guesses don't match our solution data.
     for (auto&& hint : hints) {
         if (hint.getGuess() != guessCur->guess) {
-            throwError("Given guess does not match fast solution data.");
+            throwError("Given guess does not match fast solution data. "
+                        "Try --no-fast.");
         }
         guessCur = guessCur->findChild(hint.getHint());
         if (!guessCur) {
-            throwError("Given hint does not match fast solution data.");
+            throwError("Given hint does not match fast solution data. "
+                        "Try --no-fast.");
         }
     }
     return guessCur->guess;
