@@ -33,6 +33,7 @@
     /* ITEM(id, nameShort, nameLong, valType, defVal, help) */ \
     ITEM(Init, i, init, std::string, "raise", "Initial guess word (default \"raise\", may be empty)") \
     ITEM(HardMode, d, hard, bool, false, "Hard mode - guesses must match hints") \
+    ITEM(Fast, f, fast, bool, true, "Lightning fast solutions, with limitations") \
     ITEM(Play, p, play, bool, false, "Play a game") \
     ITEM(Solve, s, solve, bool, false, "Solve for the given answers") \
     ITEM(SolveAll, a, all, bool, false, "Solve all possible answers - slow!") \
@@ -520,7 +521,8 @@ static guess_t solveWord(const word_t& target,
 }
 
 // Display the word to guess next, based on the hints given on thte command line.
-static void doNextGuess(auto args)
+// Slow implementation using heuristic algorithm.
+static void doNextGuessSlow(auto args)
 {
     if (args.empty() && hasFirstGuess() ) {
         // Use the default first guess.
@@ -1029,6 +1031,30 @@ static word_t getNextGuessFast(const std::ranges::range auto& hints,
         }
     }
     return guessCur->guess;
+}
+
+// Display the word to guess next, based on the hints given on thte command line.
+// Fast implementation, using pre-computed solution data.
+static void doNextGuessFast(auto args)
+{
+    // The command line args are the hints given so far.
+    if ((args.size() % 2) != 0) {
+        throwError("An even number of arguments is required.");
+    }
+    auto hints = convertArgsToHints(args);
+    GuessNode root = loadSolutionDataFile(dataFileName());
+    word_t guess = getNextGuessFast(hints, root);
+    lprintln("Best guess is \"{}\"", std::string_view(guess));
+}
+
+// Display the word to guess next, based on the hints given on thte command line.
+static void doNextGuess(auto args)
+{
+    if (CommandLine::GetFast()) {
+        doNextGuessFast(args);
+    } else {
+        doNextGuessSlow(args);
+    }
 }
 
 // Test 5: Fast getNextGuess
