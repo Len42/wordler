@@ -997,7 +997,7 @@ static std::string_view dataFileName()
     return CommandLine::GetHardMode() ? "dataHard.txt"sv : "dataNormal.txt"sv;
 }
 
-// Load a GuessNode tree from a data file (the output of TODO).
+// Load a GuessNode tree from a data file (the output of --build).
 // Use stdin if filename is empty.
 static GuessNode loadSolutionDataFile(std::string_view filename)
 {
@@ -1009,15 +1009,39 @@ static GuessNode loadSolutionDataFile(std::string_view filename)
     return GuessNode::readNode(input, sBuf);
 }
 
+static word_t getNextGuessFast(const std::ranges::range auto& hints,
+    const GuessNode& root)
+{
+    // Implicitly, the first hint is "....."
+    const GuessNode* guessCur = root.findChild("....."sv);
+    if (!guessCur) {
+        throwError("Failed to find the first node in the solution data.");
+    }
+    // Traverse the solution tree following the given hints and guesses.
+    // Fail out if the given guesses don't match our solution data.
+    for (auto&& hint : hints) {
+        if (hint.getGuess() != guessCur->guess) {
+            throwError("Given guess does not match fast solution data.");
+        }
+        guessCur = guessCur->findChild(hint.getHint());
+        if (!guessCur) {
+            throwError("Given hint does not match fast solution data.");
+        }
+    }
+    return guessCur->guess;
+}
+
 // Test 5: Fast getNextGuess
 static void test5(auto args)
 {
-    // TODO
-    std::println("NYI");
-    //auto targets = convertArgsToWords(args);
-    //guessRoot = loadSolutionDataFile(dataFileName());
-    //lvprintln("Tree has {} nodes", GuessNode::numNodes);
-    //doSolveFast(targets);
+    // The command line args are the hints given so far.
+    if ((args.size() % 2) != 0) {
+        throwError("An even number of arguments is required.");
+    }
+    auto hints = convertArgsToHints(args);
+    GuessNode root = loadSolutionDataFile(dataFileName());
+    word_t guess = getNextGuessFast(hints, root);
+    lprintln("Best guess is \"{}\"", std::string_view(guess));
 }
 
 static guess_t solveWordFast(const word_t& target, const GuessNode& root,
