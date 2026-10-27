@@ -1094,21 +1094,19 @@ static void doSolveFast(const std::ranges::range auto& targets)
 static void test5(auto args)
 {
     auto targets =
-#if false
+#if true
         std::views::all(allTargets);
-#elif false
+#elif true
         allTargets | std::views::take(10);
 #else
         convertArgs(args);
 #endif
 
-    //addAllToTree(targets);
-    guessRoot = loadTreeDataFile("dataHard.txt"sv);
+    addAllToTree(targets);
+    //guessRoot = loadTreeDataFile("dataHard.txt"sv);
     lvprintln("Tree has {} nodes", GuessNode::numNodes);
-
-    doSolveFast(targets);
-
-    //writeTree();
+    //doSolveFast(targets);
+    writeTree();
 }
 
 #endif // TEST5
