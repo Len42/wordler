@@ -36,6 +36,7 @@
     ITEM(Play, p, play, bool, false, "Play a game") \
     ITEM(Solve, s, solve, bool, false, "Solve for the given answers") \
     ITEM(SolveAll, a, all, bool, false, "Solve all possible answers - slow!") \
+    ITEM(BuildTree, b, build, bool, false, "Build and output the solution data file - slow!") \
     ITEM(ShowStats, x, stats, bool, false, "Display stats from a results file") \
     ITEM(Verbose, v, verbose, bool, true, "Display more output (default true)") \
     ITEM(Test, t, test, unsigned, 0, "Test mode")
@@ -972,13 +973,23 @@ static void addSolutionToTree(const word_t& target)
         });
 }
 
+// Build a solution data tree covering the given target word_t's.
+// --hard controls whether normal or hard mode solutions are generated.
 static void addAllToTree(const std::ranges::range auto& targets)
 {
     for (auto&& target : targets) {
-        lprintln("Adding {}", std::string_view(target));
         std::cout.flush();
         addSolutionToTree(target);
     }
+}
+
+// Build and output the solution data tree for all target words.
+// --hard controls whether normal or hard mode solutions are generated.
+static void doBuildTree(auto args)
+{
+    addAllToTree(allTargets);
+    guessRoot.write(0);
+    std::println();
 }
 
 // Return the name of the solution data file, which depends on whether normal or
@@ -998,6 +1009,17 @@ static GuessNode loadSolutionDataFile(std::string_view filename)
     // Read and parse the file.
     std::string sBuf;
     return GuessNode::readNode(input, sBuf);
+}
+
+// Test 5: Fast getNextGuess
+static void test5(auto args)
+{
+    // TODO
+    std::println("NYI");
+    //auto targets = convertArgsToWords(args);
+    //guessRoot = loadSolutionDataFile(dataFileName());
+    //lvprintln("Tree has {} nodes", GuessNode::numNodes);
+    //doSolveFast(targets);
 }
 
 static guess_t solveWordFast(const word_t& target, auto guessCallback)
@@ -1032,28 +1054,13 @@ static void doSolveFast(const std::ranges::range auto& targets)
     }
 }
 
-// Test 5: Fast solutions!!!
-static void test5(auto args)
+// Test 6: Fast solutions!!!
+static void test6(auto args)
 {
-    auto targets =
-#if false
-        std::views::all(allTargets);
-#elif false
-        allTargets | std::views::take(10);
-#else
-        convertArgsToWords(args);
-#endif
-
-#if false
-    addAllToTree(targets);
-    lvprintln("Tree has {} nodes", GuessNode::numNodes);
-    guessRoot.write(0);
-    std::println();
-#else
+    auto targets = convertArgsToWords(args);
     guessRoot = loadSolutionDataFile(dataFileName());
     lvprintln("Tree has {} nodes", GuessNode::numNodes);
     doSolveFast(targets);
-#endif
 }
 
 #endif // TEST5
@@ -1068,6 +1075,7 @@ static void doTest(auto args)
     case 4: test4(args); break;
 #if TEST5
     case 5: test5(args); break;
+    case 6: test6(args); break;
 #endif // TEST5
     default: throwError("Invalid test number");
     }
@@ -1087,6 +1095,8 @@ int main(int argc, char* argv[])
             doSolve(args);
         } else if (CommandLine::GetSolveAll()) {
             doSolveAll(args);
+        } else if (CommandLine::GetBuildTree()) {
+            doBuildTree(args);
         } else if (CommandLine::GetShowStats()) {
             doShowStats(args);
         } else if (CommandLine::GetTest()) {
