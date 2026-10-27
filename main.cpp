@@ -381,7 +381,7 @@ using score_t = unsigned long long;
 using guessScore_t = std::pair<word_t, score_t>;
 
 // Evaluate all guesses against a list of targets and return the best guess.
-// Helper routine for getNextGuess().
+// Helper routine for getNextGuessSlow().
 static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
     const std::ranges::range auto& guessWords)
 {
@@ -447,7 +447,7 @@ static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
 
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
-static word_t getNextGuess(const std::ranges::range auto& targets,
+static word_t getNextGuessSlow(const std::ranges::range auto& targets,
     const std::ranges::range auto& guessWords)
 {
     // guess1 is the best guess that could possibly be a correct answer,
@@ -463,7 +463,7 @@ static word_t getNextGuess(const std::ranges::range auto& targets,
     return guess.first;
 }
 
-// Solve for a given target word by calling getNextGuess() repeatedly.
+// Solve for a given target word by calling getNextGuessSlow() repeatedly.
 static guess_t solveWordSlow(const word_t& target,
     const std::ranges::range auto& targetWords,
     const std::ranges::range auto& guessWords,
@@ -486,7 +486,7 @@ static guess_t solveWordSlow(const word_t& target,
             // Use the default first guess.
             guess = getFirstGuess();
         } else {
-            guess = getNextGuess(targets, guesses);
+            guess = getNextGuessSlow(targets, guesses);
         }
         guess_t curGuess = { guess, i + 1 };
         // Call a callback function for each guess.
@@ -541,7 +541,7 @@ static void doNextGuessSlow(auto args)
             } else {
                 guessList = allGuesses | std::ranges::to<std::vector>();
             }
-            guess = getNextGuess(targets, guessList);
+            guess = getNextGuessSlow(targets, guessList);
             });
         lvprintln("Time: {:.02f} seconds", t);
         lprintln("Best guess is \"{}\"", std::string_view(guess));
