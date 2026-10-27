@@ -735,91 +735,6 @@ static void doShowStats(auto args)
     }
 }
 
-// Test 1: Match words against a Hint.
-// example args: raise .y..g geese evade amaze fubar exact blend
-static void test1(auto args)
-{
-    if (args.size() < 3) {
-        throwError("Requires 3+ args");
-    }
-    lvprintln("hint: {} {}", args[0], args[1]);
-    checkWord(args[0]);
-    checkHint(args[1]);
-    Hint hint(args[0], args[1]);
-    if (CommandLine::GetVerbose()) {
-        hint.print();
-    }
-    for (auto&& arg : args | std::views::drop(2)) {
-        word_t word;
-        checkWord(arg);
-        copyWordFrom(word, arg);
-        std::println("{} {}", std::string_view(word), hint.match(word));
-    }
-}
-
-// Test 2: Output all target words that match the given hints.
-// example args: raise .y..g grill y..y.
-static void test2(auto args)
-{
-    if ((args.size() % 2) == 1) {
-        throwError("Requires an even number of args");
-    }
-    auto hints = convertArgsToHints(args);
-    auto matches =
-        allTargets
-        | std::views::filter([&hints](auto&& word) {
-            return std::ranges::all_of(hints, [&word](auto&& hint) {
-                return hint.match(word);
-                });
-            })
-        | std::views::transform([](auto&& word) { return std::string_view(word); })
-        | std::ranges::to<std::vector>(); // convert to vector to get size()
-    lvprintln("args: {}", args);
-    lprintln("{} matches", matches.size());
-    lprintln("{}", matches);
-}
-
-// Test 3: Test Hint::fromGuess()
-// example args: grade guess guest
-static void test3(auto args)
-{
-    if (args.size() < 2) {
-        throwError("Requires 2+ args");
-    }
-    lvprintln("Target: {}", args[0]);
-    auto words = convertArgsToWords(args);
-    auto it = words.begin();
-    word_t target = *(it++);
-    while (it != words.end()) {
-        word_t guess = *(it++);
-        Hint hint = Hint::fromGuess(target, guess);
-        hint.print();
-    }
-}
-
-// Test 4: Count letter frequencies in all answers
-static void test4(auto args)
-{
-    using count_t = std::pair<char, unsigned>;
-    std::array<count_t, 'z'-'a'+1> counts;
-    for (auto&& [count, ch] : std::views::zip(counts, std::views::iota('a', 'z'+1))) {
-        count = { ch, 0 };
-    }
-    for (auto&& word : allTargets) {
-        for (char ch : word) {
-            if (ch >= 'a' && ch <= 'z') {
-                ++counts[ch - 'a'].second;
-            } else {
-                throwError("Weird character found");
-            }
-        }
-    }
-    std::ranges::sort(counts, std::greater(), &count_t::second);
-    for (auto&& [count, rank] : std::views::zip(counts, std::views::iota(1))) {
-        std::println("{}\t{}\t{} ", rank, count.first, count.second);
-    }
-}
-
 // A node in the solution data tree
 class GuessNode
 {
@@ -1075,6 +990,91 @@ static void doSolveAll(auto args)
         doSolveAllFast(args);
     } else {
         doSolveAllSlow(args);
+    }
+}
+
+// Test 1: Match words against a Hint.
+// example args: raise .y..g geese evade amaze fubar exact blend
+static void test1(auto args)
+{
+    if (args.size() < 3) {
+        throwError("Requires 3+ args");
+    }
+    lvprintln("hint: {} {}", args[0], args[1]);
+    checkWord(args[0]);
+    checkHint(args[1]);
+    Hint hint(args[0], args[1]);
+    if (CommandLine::GetVerbose()) {
+        hint.print();
+    }
+    for (auto&& arg : args | std::views::drop(2)) {
+        word_t word;
+        checkWord(arg);
+        copyWordFrom(word, arg);
+        std::println("{} {}", std::string_view(word), hint.match(word));
+    }
+}
+
+// Test 2: Output all target words that match the given hints.
+// example args: raise .y..g grill y..y.
+static void test2(auto args)
+{
+    if ((args.size() % 2) == 1) {
+        throwError("Requires an even number of args");
+    }
+    auto hints = convertArgsToHints(args);
+    auto matches =
+        allTargets
+        | std::views::filter([&hints](auto&& word) {
+        return std::ranges::all_of(hints, [&word](auto&& hint) {
+            return hint.match(word);
+            });
+            })
+        | std::views::transform([](auto&& word) { return std::string_view(word); })
+        | std::ranges::to<std::vector>(); // convert to vector to get size()
+    lvprintln("args: {}", args);
+    lprintln("{} matches", matches.size());
+    lprintln("{}", matches);
+}
+
+// Test 3: Test Hint::fromGuess()
+// example args: grade guess guest
+static void test3(auto args)
+{
+    if (args.size() < 2) {
+        throwError("Requires 2+ args");
+    }
+    lvprintln("Target: {}", args[0]);
+    auto words = convertArgsToWords(args);
+    auto it = words.begin();
+    word_t target = *(it++);
+    while (it != words.end()) {
+        word_t guess = *(it++);
+        Hint hint = Hint::fromGuess(target, guess);
+        hint.print();
+    }
+}
+
+// Test 4: Count letter frequencies in all answers
+static void test4(auto args)
+{
+    using count_t = std::pair<char, unsigned>;
+    std::array<count_t, 'z' - 'a' + 1> counts;
+    for (auto&& [count, ch] : std::views::zip(counts, std::views::iota('a', 'z' + 1))) {
+        count = { ch, 0 };
+    }
+    for (auto&& word : allTargets) {
+        for (char ch : word) {
+            if (ch >= 'a' && ch <= 'z') {
+                ++counts[ch - 'a'].second;
+            } else {
+                throwError("Weird character found");
+            }
+        }
+    }
+    std::ranges::sort(counts, std::greater(), &count_t::second);
+    for (auto&& [count, rank] : std::views::zip(counts, std::views::iota(1))) {
+        std::println("{}\t{}\t{} ", rank, count.first, count.second);
     }
 }
 
