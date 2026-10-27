@@ -1,9 +1,6 @@
 // Copyright (c) Len Popp
 // This source code is licensed under the MIT license - see LICENSE file.
 
-// TEMP
-#define TEST5 true
-
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -19,9 +16,7 @@
 #include <string_view>
 #include <string>
 #include <vector>
-#if TEST5
 #include <map>
-#endif
 
 #include "timer.h"
 
@@ -469,7 +464,7 @@ static word_t getNextGuess(const std::ranges::range auto& targets,
 }
 
 // Solve for a given target word by calling getNextGuess() repeatedly.
-static guess_t solveWord(const word_t& target,
+static guess_t solveWordSlow(const word_t& target,
     const std::ranges::range auto& targetWords,
     const std::ranges::range auto& guessWords,
     auto guessCallback)
@@ -616,7 +611,7 @@ static void printGuessCallback(const guess_t& g)
 }
 
 // Show the solution for the target word given on the command line.
-static void doSolve(auto args)
+static void doSolveSlow(auto args)
 {
     // Play games automatically with given target words.
     auto targets = convertArgsToWords(args);
@@ -624,7 +619,7 @@ static void doSolve(auto args)
         lvprintln("Target: \"{}\"", std::string_view(target));
         guess_t solution;
         double t = runTime([&]() {
-            solution = solveWord(target, allTargets, allGuesses, printGuessCallback);
+            solution = solveWordSlow(target, allTargets, allGuesses, printGuessCallback);
             });
         lvprintln("Time: {:.02f} seconds", t);
         lvprint("Answer: \"{}\" in ", std::string_view(solution.first));
@@ -632,12 +627,11 @@ static void doSolve(auto args)
     }
 }
 
-// Solve for _all_ target words. (This takes hours to run.) Print the number of
-// guesses required for each word.
-static void doSolveAll(auto args)
+// Solve for _all_ target words. (This takes hours to run.)
+static void doSolveAllSlow(auto args)
 {
     for (auto&& target : allTargets) {
-        guess_t solution = solveWord(target, allTargets, allGuesses,
+        guess_t solution = solveWordSlow(target, allTargets, allGuesses,
             [](const guess_t&){});
         std::println("{}, {}", std::string_view(solution.first), solution.second);
         std::cout.flush();
@@ -826,46 +820,12 @@ static void test4(auto args)
     }
 }
 
-#if TEST5
-
-static constexpr char hintChars[3] = {'.', 'y', 'g'};
-
-static std::ranges::view auto getAllHints()
-{
-    return std::views::cartesian_product(hintChars, hintChars, hintChars, hintChars, hintChars)
-        | std::views::transform([](auto&& tup) {
-                return word_t{ std::get<0>(tup), std::get<1>(tup), std::get<2>(tup), std::get<3>(tup), std::get<4>(tup) };
-            });
-}
-
-static unsigned indexFromHint(const word_t& w)
-{
-    unsigned n = 0;
-    for (auto&& ch : w) {
-        unsigned nCh = (ch == 'g' ? 2 : (ch == 'y' ? 1 : 0));
-        n = 3 * n + nCh;
-    }
-    return n;
-}
-
-static word_t hintFromIndex(unsigned n)
-{
-    word_t hint;
-    for (unsigned i = 0; i < wordLen; ++i) {
-        unsigned nCh = n % 3;
-        n /= 3;
-        char ch = (nCh == 2 ? 'g' : (nCh == 1 ? 'y' : '.'));
-        hint[wordLen - 1 - i] = ch;
-    }
-    return hint;
-}
-
+// A node in the solution data tree
 class GuessNode
 {
 public: // private:
     word_t guess = nonWord();
     std::map<word_t, GuessNode> children; // map hint -> next GuessNode
-    static size_t numNodes;
 
 public:
     explicit GuessNode(const word_t& guessIn) : guess(guessIn) { }
@@ -873,9 +833,7 @@ public:
     GuessNode& addChild(const word_t& hint, const GuessNode& child)
     {
         auto [it, f] = children.insert({ hint, child });
-        if (f) {
-            ++numNodes;
-        } else {
+        if (!f) {
             // Check if trying to set a different guess value - that's an error!
             if (child.guess != it->second.guess) {
                 throwError("GuessNode::addChild: different guesses for the same hint");
@@ -959,13 +917,11 @@ private:
     }
 };
 
-size_t GuessNode::numNodes = 1; // start at 1 to count the tree root node
-
 static void addSolutionToTree(const word_t& target, GuessNode& root)
 {
     GuessNode* guessCur = &root;
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
-    guess_t solution = solveWord(target, allTargets, allGuesses,
+    guess_t solution = solveWordSlow(target, allTargets, allGuesses,
         [&target, &guessCur, &hintCur](const guess_t& g) {
             guessCur = &guessCur->addChild(hintCur.getHint(), g.first);
             hintCur = Hint::fromGuess(target, g.first);
@@ -976,7 +932,7 @@ static void addSolutionToTree(const word_t& target, GuessNode& root)
 // --hard controls whether normal or hard mode solutions are generated.
 static void addAllToTree(const std::ranges::range auto& targets, GuessNode& root)
 {
-    for (auto&& target : targets /*DEBUG*/ | std::views::take(3)) {
+    for (auto&& target : targets) {
         std::cout.flush();
         addSolutionToTree(target, root);
     }
@@ -984,6 +940,7 @@ static void addAllToTree(const std::ranges::range auto& targets, GuessNode& root
 
 // Build and output the solution data tree for all target words.
 // --hard controls whether normal or hard mode solutions are generated.
+// This takes hours to run.
 static void doBuildTree(auto args)
 {
     GuessNode root = GuessNode(nonWord());
@@ -1057,19 +1014,6 @@ static void doNextGuess(auto args)
     }
 }
 
-// Test 5: Fast getNextGuess
-static void test5(auto args)
-{
-    // The command line args are the hints given so far.
-    if ((args.size() % 2) != 0) {
-        throwError("An even number of arguments is required.");
-    }
-    auto hints = convertArgsToHints(args);
-    GuessNode root = loadSolutionDataFile(dataFileName());
-    word_t guess = getNextGuessFast(hints, root);
-    lprintln("Best guess is \"{}\"", std::string_view(guess));
-}
-
 static guess_t solveWordFast(const word_t& target, const GuessNode& root,
     auto guessCallback)
 {
@@ -1104,14 +1048,35 @@ static void doSolveFast(auto args)
     }
 }
 
-// Test 6: Fast solutions!!!
-static void test6(auto args)
+static void doSolve(auto args)
 {
-    lvprintln("Tree has {} nodes", GuessNode::numNodes);
-    doSolveFast(args);
+    if (CommandLine::GetFast()) {
+        doSolveFast(args);
+    } else {
+        doSolveSlow(args);
+    }
 }
 
-#endif // TEST5
+// Solve for _all_ target words - fast mode.
+static void doSolveAllFast(auto args)
+{
+    GuessNode root = loadSolutionDataFile(dataFileName());
+    for (auto&& target : allTargets) {
+        guess_t solution = solveWordFast(target, root, [](const guess_t&) {});
+        std::println("{}, {}", std::string_view(solution.first), solution.second);
+        std::cout.flush();
+    }
+}
+
+// Solve for _all_ target words. (This takes hours to run in slow mode.)
+static void doSolveAll(auto args)
+{
+    if (CommandLine::GetFast()) {
+        doSolveAllFast(args);
+    } else {
+        doSolveAllSlow(args);
+    }
+}
 
 // Run the test specified by the --test option.
 static void doTest(auto args)
@@ -1121,10 +1086,6 @@ static void doTest(auto args)
     case 2: test2(args); break;
     case 3: test3(args); break;
     case 4: test4(args); break;
-#if TEST5
-    case 5: test5(args); break;
-    case 6: test6(args); break;
-#endif // TEST5
     default: throwError("Invalid test number");
     }
 }
