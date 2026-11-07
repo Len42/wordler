@@ -864,6 +864,17 @@ static void doBuildTree(auto args)
     std::println();
 }
 
+/*
+* TODO: addWordToTree(auto args)
+* Run this to update the solution data files after adding a word to words-target.txt,
+* to avoid spending all day re-calculating the solution data from scratch.
+* loadSolutionDataFile(), addSolutionToTree(), root.write()
+* Note: This could cause instances where the fast and slow solutions for a word
+* differ, because moving a word from words-guess.txt to words-target.txt changes the
+* order of words processed by getNextGuessSlow() which can change the solution.
+*/
+
+// TODO: make this a static function in GuessNode
 // Return the name of the solution data file, which depends on whether normal or
 // hard mode is selected.
 static std::string_view dataFileName()
@@ -871,6 +882,7 @@ static std::string_view dataFileName()
     return CommandLine::GetHardMode() ? "data-hard.txt"sv : "data-normal.txt"sv;
 }
 
+// TODO: make this a static function in GuessNode
 // Load a GuessNode tree from a data file (the output of --build).
 // Use stdin if filename is empty.
 static GuessNode loadSolutionDataFile(std::string_view filename)
