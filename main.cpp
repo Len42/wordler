@@ -908,12 +908,12 @@ static word_t getNextGuessFast(const std::ranges::range auto& hints,
     for (auto&& hint : hints) {
         if (hint.getGuess() != guessCur->guess) {
             throwError("Given guess does not match fast solution data. "
-                        "Try --no-fast.");
+                        "Try again with --no-fast.");
         }
         guessCur = guessCur->findChild(hint.getHint());
         if (!guessCur) {
             throwError("Given hint does not match fast solution data. "
-                        "Try --no-fast.");
+                        "Try again with --no-fast.");
         }
     }
     return guessCur->guess;
@@ -952,6 +952,7 @@ static guess_t solveWordFast(const word_t& target, const GuessNode& root,
     for (;;) {
         guessCur = guessCur->findChild(hintCur.getHint());
         if (!guessCur) {
+            throwError("Fast solution not found. Try again with --no-fast.");
             throwError("No matching words found.");
         }
         guess_t guess = { guessCur->guess, ++numGuesses };
