@@ -956,7 +956,7 @@ static void doNextGuessFast(auto args)
     GuessNode root = loadSolutionDataFile(dataFileName());
     auto guess = getNextGuessFast(hints, root);
     if (!guess) {
-        throwError("Could not find a valid guess.");
+        throwError("Could not find a valid guess. Try again with --no-fast.");
     }
     lprintln("Best guess is \"{}\"", std::string_view(*guess));
 }
@@ -1002,7 +1002,7 @@ static void doSolveFast(auto args)
         lvprintln("Target: \"{}\"", std::string_view(target));
         auto solution = solveWordFast(target, root, printGuessCallback);
         if (!solution) {
-            throwError("No solution found.");
+            throwError("No solution found. Try again with --no-fast.");
         }
         lvprint("Answer: \"{}\" in ", std::string_view(solution->first));
         lprintln("{} tries", solution->second);
@@ -1034,8 +1034,6 @@ static void doSolveAllFast(auto args)
     }
 }
 
-// TODO: addMissingToTree, doAddMissingToTree
-
 // Solve for _all_ target words. (This takes hours to run in slow mode.)
 static void doSolveAll(auto args)
 {
@@ -1045,6 +1043,8 @@ static void doSolveAll(auto args)
         doSolveAllSlow(args);
     }
 }
+
+// TODO: addMissingToTree, doAddMissingToTree
 
 // Test 1: Match words against a Hint.
 // example args: raise .y..g geese evade amaze fubar exact blend
