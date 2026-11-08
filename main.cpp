@@ -382,18 +382,19 @@ using guessScore_t = std::pair<word_t, score_t>;
 
 // Evaluate all guesses against a list of targets and return the best guess.
 // Helper routine for getNextGuessSlow().
-static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
+static std::optional<guessScore_t> getNextGuessSub(
+    const std::ranges::range auto& targets,
     const std::ranges::range auto& guessWords)
 {
     // Check a couple of special cases.
     if (targets.empty()) {
         // Oops, no matching words at all!
-        throwError("No matching words found.");
+        return std::nullopt;
     } else if (targets.size() <= 2) {
         // Only two possibilities remain - pick one.
         // This prevents an extra roundabout guess when there are only 2 alternatives.
         const word_t& guess = targets.front();
-        return { guess, 0 };
+        return guessScore_t{ guess, 0 };
     }
 
     // Test all guess words, looking for the best one.
@@ -447,28 +448,36 @@ static guessScore_t getNextGuessSub(const std::ranges::range auto& targets,
 
 // Choose the best word to guess next, given that the correct answer is in a
 // list of target words.
-static word_t getNextGuessSlow(const std::ranges::range auto& targets,
+static std::optional<word_t> getNextGuessSlow(
+    const std::ranges::range auto& targets,
     const std::ranges::range auto& guessWords)
 {
     // guess1 is the best guess that could possibly be a correct answer,
     // guess2 is the best guess of any valid word.
-    guessScore_t guess1 = getNextGuessSub(targets, targets);
-    guessScore_t guess2 = getNextGuessSub(targets, guessWords);
+    std::optional<guessScore_t> guess1 = getNextGuessSub(targets, targets);
+    std::optional<guessScore_t> guess2 = getNextGuessSub(targets, guessWords);
     // Compare scores of guess1 and guess2, giving a slight preference to a
     // guess that could fortuitously be the correct answer.
-    static constexpr double preference = 1.1;
-    const guessScore_t& guess =
-        (guess1.second <= score_t(preference * guess2.second + 1))
-            ? guess1 : guess2;
-    return guess.first;
+    if (!guess1) {
+        return guess2 ? guess2->first : std::optional<word_t>{};
+    } else if (!guess2) {
+        return guess1->first;
+    } else {
+        static constexpr double preference = 1.1;
+        const guessScore_t& guess =
+            (guess1->second <= score_t(preference * guess2->second + 1))
+                ? *guess1 : *guess2;
+        return guess.first;
+    }
 }
 
 // Solve for a given target word by calling getNextGuessSlow() repeatedly.
-static guess_t solveWordSlow(const word_t& target,
+static std::optional<guess_t> solveWordSlow(const word_t& target,
     const std::ranges::range auto& targetWords,
     const std::ranges::range auto& guessWords,
     auto guessCallback)
 {
+    std::println("solveWordSlow"); // TODO: REMOVE
     // Keep the lists of currently plausible target and guess words in a std::vector.
     wordList_t targets{ std::from_range, targetWords };
     wordList_t guesses{ std::from_range, guessWords };
@@ -486,13 +495,17 @@ static guess_t solveWordSlow(const word_t& target,
             // Use the default first guess.
             guess = getFirstGuess();
         } else {
-            guess = getNextGuessSlow(targets, guesses);
+            auto guessT = getNextGuessSlow(targets, guesses);
+            if (!guessT) {
+                // Failed to find a valid guess.
+                return std::nullopt;
+            }
+            guess = *guessT;
         }
         guess_t curGuess = { guess, i + 1 };
         // Call a callback function for each guess.
         guessCallback(curGuess);
         // Is this the correct answer?
-        //if (std::string_view(guess) == std::string_view(target)) {
         if (guess == target) {
             // Return the answer and the number of guesses.
             return curGuess;
@@ -508,11 +521,11 @@ static guess_t solveWordSlow(const word_t& target,
         }
         if (targets.empty()) {
             // Oops, no matching words at all!
-            throwError("No matching words found.");
+            return std::nullopt;
         }
     }
-    throwError(std::format("Answer \"{}\" was not found in {} tries.",
-        std::string_view(target), maxGuessesT).c_str());
+    // Oops, out of guesses.
+    return std::nullopt;
 }
 
 // Display the word to guess next, based on the hints given on thte command line.
@@ -527,7 +540,7 @@ static void doNextGuessSlow(auto args)
         if ((args.size() % 2) != 0) {
             throwError("An even number of arguments is required.");
         }
-        word_t guess = nonWord();
+        std::optional<word_t> guess = nonWord();
         // Find a good next guess. Show how long it takes.
         double t = runTime([&]() {
             auto hints = convertArgsToHints(args);
@@ -544,7 +557,11 @@ static void doNextGuessSlow(auto args)
             guess = getNextGuessSlow(targets, guessList);
             });
         lvprintln("Time: {:.02f} seconds", t);
-        lprintln("Best guess is \"{}\"", std::string_view(guess));
+        if (guess) {
+            lprintln("Best guess is \"{}\"", std::string_view(*guess));
+        } else {
+            std::println("Unable to make a guess.");
+        }
     }
 }
 
@@ -617,13 +634,17 @@ static void doSolveSlow(auto args)
     auto targets = convertArgsToWords(args);
     for (auto&& target : targets) {
         lvprintln("Target: \"{}\"", std::string_view(target));
-        guess_t solution;
+        std::optional<guess_t> solution;
         double t = runTime([&]() {
             solution = solveWordSlow(target, allTargets, allGuesses, printGuessCallback);
             });
         lvprintln("Time: {:.02f} seconds", t);
-        lvprint("Answer: \"{}\" in ", std::string_view(solution.first));
-        lprintln("{} tries", solution.second);
+        if (solution) {
+            lvprint("Answer: \"{}\" in ", std::string_view(solution->first));
+            lprintln("{} tries", solution->second);
+        } else {
+            std::println("No solution found.");
+        }
     }
 }
 
@@ -631,9 +652,14 @@ static void doSolveSlow(auto args)
 static void doSolveAllSlow(auto args)
 {
     for (auto&& target : allTargets) {
-        guess_t solution = solveWordSlow(target, allTargets, allGuesses,
+        auto solution = solveWordSlow(target, allTargets, allGuesses,
             [](const guess_t&){});
-        std::println("{}, {}", std::string_view(solution.first), solution.second);
+        if (solution) {
+            std::println("{}, {}",
+                std::string_view(solution->first), solution->second);
+        } else {
+            std::println("{}, 0", std::string_view(target));
+        }
         std::cout.flush();
     }
 }
@@ -836,7 +862,7 @@ static void addSolutionToTree(const word_t& target, GuessNode& root)
 {
     GuessNode* guessCur = &root;
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
-    guess_t solution = solveWordSlow(target, allTargets, allGuesses,
+    auto solution = solveWordSlow(target, allTargets, allGuesses,
         [&target, &guessCur, &hintCur](const guess_t& g) {
             guessCur = &guessCur->addChild(hintCur.getHint(), g.first);
             hintCur = Hint::fromGuess(target, g.first);
@@ -895,6 +921,7 @@ static GuessNode loadSolutionDataFile(std::string_view filename)
     return GuessNode::readNode(input, sBuf);
 }
 
+// TODO: std::optional
 static word_t getNextGuessFast(const std::ranges::range auto& hints,
     const GuessNode& root)
 {
