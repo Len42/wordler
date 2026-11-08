@@ -477,7 +477,6 @@ static std::optional<guess_t> solveWordSlow(const word_t& target,
     const std::ranges::range auto& guessWords,
     auto guessCallback)
 {
-    std::println("solveWordSlow"); // TODO: REMOVE
     // Keep the lists of currently plausible target and guess words in a std::vector.
     wordList_t targets{ std::from_range, targetWords };
     wordList_t guesses{ std::from_range, guessWords };
@@ -557,11 +556,10 @@ static void doNextGuessSlow(auto args)
             guess = getNextGuessSlow(targets, guessList);
             });
         lvprintln("Time: {:.02f} seconds", t);
-        if (guess) {
-            lprintln("Best guess is \"{}\"", std::string_view(*guess));
-        } else {
-            std::println("Unable to make a guess.");
+        if (!guess) {
+            throwError("Could not find a valid guess.");
         }
+        lprintln("Best guess is \"{}\"", std::string_view(*guess));
     }
 }
 
@@ -639,12 +637,11 @@ static void doSolveSlow(auto args)
             solution = solveWordSlow(target, allTargets, allGuesses, printGuessCallback);
             });
         lvprintln("Time: {:.02f} seconds", t);
-        if (solution) {
-            lvprint("Answer: \"{}\" in ", std::string_view(solution->first));
-            lprintln("{} tries", solution->second);
-        } else {
-            std::println("No solution found.");
+        if (!solution) {
+            throwError("No solution found.");
         }
+        lvprint("Answer: \"{}\" in ", std::string_view(solution->first));
+        lprintln("{} tries", solution->second);
     }
 }
 
@@ -921,26 +918,27 @@ static GuessNode loadSolutionDataFile(std::string_view filename)
     return GuessNode::readNode(input, sBuf);
 }
 
-// TODO: std::optional
-static word_t getNextGuessFast(const std::ranges::range auto& hints,
+static std::optional<word_t> getNextGuessFast(
+    const std::ranges::range auto& hints,
     const GuessNode& root)
 {
     // Implicitly, the first hint is "....."
     const GuessNode* guessCur = root.findChild("....."sv);
     if (!guessCur) {
-        throwError("Failed to find the first node in the solution data.");
+        // Failed to find the first node in the solution data.
+        return std::nullopt;
     }
     // Traverse the solution tree following the given hints and guesses.
     // Fail out if the given guesses don't match our solution data.
     for (auto&& hint : hints) {
         if (hint.getGuess() != guessCur->guess) {
-            throwError("Given guess does not match fast solution data. "
-                        "Try again with --no-fast.");
+            // Given guess does not match fast solution data.
+            return std::nullopt;
         }
         guessCur = guessCur->findChild(hint.getHint());
         if (!guessCur) {
-            throwError("Given hint does not match fast solution data. "
-                        "Try again with --no-fast.");
+            // Given hint does not match fast solution data.
+            return std::nullopt;
         }
     }
     return guessCur->guess;
@@ -956,8 +954,11 @@ static void doNextGuessFast(auto args)
     }
     auto hints = convertArgsToHints(args);
     GuessNode root = loadSolutionDataFile(dataFileName());
-    word_t guess = getNextGuessFast(hints, root);
-    lprintln("Best guess is \"{}\"", std::string_view(guess));
+    auto guess = getNextGuessFast(hints, root);
+    if (!guess) {
+        throwError("Could not find a valid guess.");
+    }
+    lprintln("Best guess is \"{}\"", std::string_view(*guess));
 }
 
 // Display the word to guess next, based on the hints given on thte command line.
@@ -970,8 +971,8 @@ static void doNextGuess(auto args)
     }
 }
 
-static guess_t solveWordFast(const word_t& target, const GuessNode& root,
-    auto guessCallback)
+static std::optional<guess_t> solveWordFast(const word_t& target,
+    const GuessNode& root, auto guessCallback)
 {
     const GuessNode* guessCur = &root;
     Hint hintCur = Hint("xxxxx"sv, "....."sv);
@@ -979,8 +980,8 @@ static guess_t solveWordFast(const word_t& target, const GuessNode& root,
     for (;;) {
         guessCur = guessCur->findChild(hintCur.getHint());
         if (!guessCur) {
-            throwError("Fast solution not found. Try again with --no-fast.");
-            throwError("No matching words found.");
+            // Fast solution not found.
+            return std::nullopt;
         }
         guess_t guess = { guessCur->guess, ++numGuesses };
         // Call a callback function for each guess.
@@ -999,9 +1000,12 @@ static void doSolveFast(auto args)
     GuessNode root = loadSolutionDataFile(dataFileName());
     for (auto&& target : convertArgsToWords(args)) {
         lvprintln("Target: \"{}\"", std::string_view(target));
-        guess_t solution = solveWordFast(target, root, printGuessCallback);
-        lvprint("Answer: \"{}\" in ", std::string_view(solution.first));
-        lprintln("{} tries", solution.second);
+        auto solution = solveWordFast(target, root, printGuessCallback);
+        if (!solution) {
+            throwError("No solution found.");
+        }
+        lvprint("Answer: \"{}\" in ", std::string_view(solution->first));
+        lprintln("{} tries", solution->second);
     }
 }
 
@@ -1019,11 +1023,18 @@ static void doSolveAllFast(auto args)
 {
     GuessNode root = loadSolutionDataFile(dataFileName());
     for (auto&& target : allTargets) {
-        guess_t solution = solveWordFast(target, root, [](const guess_t&) {});
-        std::println("{}, {}", std::string_view(solution.first), solution.second);
+        auto solution = solveWordFast(target, root, [](const guess_t&) {});
+        if (solution) {
+            std::println("{}, {}", std::string_view(solution->first),
+                solution->second);
+        } else {
+            std::println("{}, 0", std::string_view(target));
+        }
         std::cout.flush();
     }
 }
+
+// TODO: addMissingToTree, doAddMissingToTree
 
 // Solve for _all_ target words. (This takes hours to run in slow mode.)
 static void doSolveAll(auto args)
